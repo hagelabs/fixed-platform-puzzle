@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta Game Mechanics 2025-2026</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: white;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        .subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        th {
+            padding: 20px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+        }
+        td {
+            padding: 16px 20px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+        tbody tr:hover {
+            background: #f9f9f9;
+        }
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .mechanic {
+            font-weight: 600;
+            color: #667eea;
+        }
+        .game-title {
+            font-weight: 600;
+            color: #333;
+        }
+        .market-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .trending {
+            background: #d4edda;
+            color: #155724;
+        }
+        .hot {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .established {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .difficulty {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .easy {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .medium {
+            background: #fff8e1;
+            color: #f57f17;
+        }
+        .hard {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .notes {
+            font-size: 13px;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Meta Game Mechanics 2025-2026</h1>
+        <p class="subtitle">Game-game populer diterima market dengan mekanik unik. Data dari market research terkini.</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 120px;">Mekanik</th>
+                    <th style="width: 150px;">Game Contoh</th>
+                    <th>Core Gameplay</th>
+                    <th style="width: 100px;">Status Market</th>
+                    <th style="width: 100px;">Difficulty</th>
+                    <th style="width: 150px;">Web Platform Viability</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- SHOOTING CUBE -->
+                <tr>
+                    <td><span class="mechanic">Shooting Cube Physics</span></td>
+                    <td><span class="game-title">Pixel Flow Arrow</span></td>
+                    <td>Buat projectile stream. Hancurkan struktur geometric. ASMR element (pixel dissolve sound).</td>
+                    <td><span class="market-status hot">HOT</span></td>
+                    <td><span class="difficulty easy">MUDAH</span></td>
+                    <td>✓ Sangat cocok. Physics engine ringan.</td>
+                </tr>
+
+                <!-- FIXED PLATFORM PUZZLE -->
+                <tr>
+                    <td><span class="mechanic">Fixed Platform Puzzle</span></td>
+                    <td><span class="game-title">Parking Jam, Bus Jam</span></td>
+                    <td>Grid-based logic. Move blocks off board. Order matters (dead-end if salah urutan). Aha moment satisfaction.</td>
+                    <td><span class="market-status trending">TRENDING</span></td>
+                    <td><span class="difficulty medium">SEDANG</span></td>
+                    <td>✓ Ideal untuk web. Logic puzzle + progression.</td>
+                </tr>
+
+                <!-- ASSOCIATION MECHANICS -->
+                <tr>
+                    <td><span class="mechanic">Association / Semantic Pairing</span></td>
+                    <td><span class="game-title">TBD (emerging)</span></td>
+                    <td>Match items by logic connection (Cloud+Rain, Hammer+Nail). Educational feel. No timer stress.</td>
+                    <td><span class="market-status trending">TRENDING</span></td>
+                    <td><span class="difficulty easy">MUDAH</span></td>
+                    <td>✓ Sempurna web. Simple mechanic, high engagement.</td>
+                </tr>
+
+                <!-- HYBRID CASUAL -->
+                <tr>
+                    <td><span class="mechanic">Hybrid-Casual Progression</span></td>
+                    <td><span class="game-title">Archero, Survivor.io</span></td>
+                    <td>Simple awal. Gradual depth reveal. Upgrade/build choices. Strategic decision later.</td>
+                    <td><span class="market-status hot">HOT</span></td>
+                    <td><span class="difficulty easy">MUDAH</span></td>
+                    <td>✓ Sangat cocok. Low entry barrier, high retention.</td>
+                </tr>
+
+                <!-- IDLE MECHANICS -->
+                <tr>
+                    <td><span class="mechanic">Idle / AFK Progress</span></td>
+                    <td><span class="game-title">AFK Arena, Idle Miner Tycoon</span></td>
+                    <td>Passive income while offline. Check-in rewards. Shorten session gap. Background progress.</td>
+                    <td><span class="market-status established">ESTABLISHED</span></td>
+                    <td><span class="difficulty easy">MUDAH</span></td>
+                    <td>✓ Optimal web + mobile. Server-side tracking.</td>
+                </tr>
+
+                <!-- ROGUELITE SHOOTER -->
+                <tr>
+                    <td><span class="mechanic">Roguelite Bullet-Hell</span></td>
+                    <td><span class="game-title">Vampire Survivors, Deep Rock Survivors</span></td>
+                    <td>Waves infinite. Manage projectile chaos. Pick-up power-ups. Die = restart run. Meta-builds</td>
+                    <td><span class="market-status hot">HOT</span></td>
+                    <td><span class="difficulty medium">SEDANG</span></td>
+                    <td>△ Bisa web. Perlu optimization sprite rendering.</td>
+                </tr>
+
+                <!-- DICE PROBABILITY -->
+                <tr>
+                    <td><span class="mechanic">Dice Roll / Probability</span></td>
+                    <td><span class="game-title">Citizen Sleeper 2, Peglin</span></td>
+                    <td>Roll dice, assign ke actions. Skill checks. Narrative branch by RNG. Replayability tinggi.</td>
+                    <td><span class="market-status trending">TRENDING</span></td>
+                    <td><span class="difficulty medium">SEDANG</span></td>
+                    <td>✓ Sangat cocok web. Deterministic RNG.</td>
+                </tr>
+
+                <!-- RHYTHM MECHANICS -->
+                <tr>
+                    <td><span class="mechanic">Rhythm-Based Action</span></td>
+                    <td><span class="game-title">Rift of NecroDancer, Rhythm Doctor</span></td>
+                    <td>Defibrillate/act on beat. Learn pattern unique. Boss viruses. Music-driven gameplay.</td>
+                    <td><span class="market-status established">ESTABLISHED</span></td>
+                    <td><span class="difficulty medium">SEDANG</span></td>
+                    <td>△ Web perlu audio latency handling.</td>
+                </tr>
+
+                <!-- CO-OP EXPLORATION -->
+                <tr>
+                    <td><span class="mechanic">Co-op Puzzle / Exploration</span></td>
+                    <td><span class="game-title">PEAK, Abiotic Factor</span></td>
+                    <td>Teamwork-dependent terrain. Social bonding mechanic. Traverse impossible solo. 2-6 players.</td>
+                    <td><span class="market-status hot">HOT</span></td>
+                    <td><span class="difficulty hard">SULIT</span></td>
+                    <td>✓ Web-viable dengan WebSocket sync.</td>
+                </tr>
+
+                <!-- ROGUELITE PUZZLE -->
+                <tr>
+                    <td><span class="mechanic">Roguelite Puzzle</span></td>
+                    <td><span class="game-title">Blue Prince</span></td>
+                    <td>RNG generate puzzle baru. Solve = unlock harder puzzle. Replayable logic infinite.</td>
+                    <td><span class="market-status hot">HOT</span></td>
+                    <td><span class="difficulty hard">SULIT</span></td>
+                    <td>✓ Perfect web game. Pure logic, no graphics heavy.</td>
+                </tr>
+
+                <!-- CREATURE COLLECTING SHOOTER -->
+                <tr>
+                    <td><span class="mechanic">Creature-Collecting Shooter</span></td>
+                    <td><span class="game-title">Morsels</span></td>
+                    <td>Kumpul creature. Humor-driven character. Rogue-lite runs. Meta-game collection.</td>
+                    <td><span class="market-status trending">TRENDING</span></td>
+                    <td><span class="difficulty easy">MUDAH</span></td>
+                    <td>△ Web bisa, tapi visual-heavy. Sprite optimization perlu.</td>
+                </tr>
+
+                <!-- TURN-BASED RPG + REAL-TIME -->
+                <tr>
+                    <td><span class="mechanic">Hybrid Combat Turn/Real-time</span></td>
+                    <td><span class="game-title">Clair Obscur Expedition 33</span></td>
+                    <td>Turn-based flow. Real-time dodge/parry during turn. Chain combo rhythm. Weak point aiming.</td>
+                    <td><span class="market-status hot">HOT</span></td>
+                    <td><span class="difficulty hard">SULIT</span></td>
+                    <td>△ Web minimal. Better desktop/console.</td>
+                </tr>
+
+                <!-- COZY + BRUTAL BALANCE -->
+                <tr>
+                    <td><span class="mechanic">Cozy + Brutal Hybrid</span></td>
+                    <td><span class="game-title">Winter Burrow, A Short Hike clone</span></td>
+                    <td>Cozy aesthetic (home design, farming). Brutal difficulty spike. Emotional narrative quest.</td>
+                    <td><span class="market-status trending">TRENDING</span></td>
+                    <td><span class="difficulty medium">SEDANG</span></td>
+                    <td>✓ Cocok web. Story-driven, minimal action intensive.</td>
+                </tr>
+
+                <!-- SLOT MACHINE NARRATIVE -->
+                <tr>
+                    <td><span class="mechanic">Slot Machine Roguelite</span></td>
+                    <td><span class="game-title">Consume Me, Peglin</span></td>
+                    <td>Gamble mechanic. Lucky charms/relics modify odd. Escape debt simulator. Irreverent tone.</td>
+                    <td><span class="market-status trending">TRENDING</span></td>
+                    <td><span class="difficulty easy">MUDAH</span></td>
+                    <td>✓ Ideal web. RNG + UI-heavy.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="margin-top: 30px; color: white; font-size: 13px;">
+            <p><strong>Legend:</strong></p>
+            <p>• <span class="market-status hot">HOT</span> = Peak momentum. High market adoption rate now.</p>
+            <p>• <span class="market-status trending">TRENDING</span> = Growing momentum. Expected 2026 boom.</p>
+            <p>• <span class="market-status established">ESTABLISHED</span> = Stable market. Proven monetization.</p>
+            <p style="margin-top: 15px;"><strong>Web Viability:</strong></p>
+            <p>• ✓ = Recommended untuk web. Optimize code saja.</p>
+            <p>• △ = Possible web. Perlu technical optimization.</p>
+        </div>
+    </div>
+</body>
+</html>

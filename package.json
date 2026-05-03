@@ -1,0 +1,31 @@
+{
+  "name": "fixed-platform-puzzle",
+  "version": "0.1.0",
+  "description": "Grid-based puzzle game for Poki and CrazyGames",
+  "private": true,
+  "scripts": {
+    "dev": "webpack serve --config webpack.config.js --mode development",
+    "build": "webpack --config webpack.config.js --mode production",
+    "analyze": "webpack --config webpack.config.js --mode production --json > stats.json"
+  },
+  "keywords": [
+    "phaser",
+    "puzzle",
+    "game",
+    "poki",
+    "crazygames"
+  ],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "phaser": "^4.1.0"
+  },
+  "devDependencies": {
+    "html-webpack-plugin": "^5.6.7",
+    "ts-loader": "^9.5.7",
+    "typescript": "^6.0.3",
+    "webpack": "^5.106.2",
+    "webpack-cli": "^7.0.2",
+    "webpack-dev-server": "^5.2.3"
+  }
+}

@@ -22,5 +22,8 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
   },
+  audio: {
+    noAudio: true,
+  },
   scene: [BootScene, MenuScene, LevelSelectScene, GameScene, TutorialScene, PauseScene, GameOverScene],
 };

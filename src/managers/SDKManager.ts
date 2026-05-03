@@ -8,7 +8,7 @@ interface PokiAPI {
   gameplayStop?: () => void;
   commercialBreak?: (onStart?: () => void) => Promise<void>;
   rewardedBreak?: (opts?: { size?: RewardedSize; onStart?: () => void }) => Promise<boolean>;
-  customEvent?: (n: string, m?: object) => void;
+  customEvent?: (noun: string, verb: string, value?: string, payload?: object) => void;
 }
 
 interface CrazyAPI {
@@ -117,7 +117,10 @@ class SDKManagerImpl {
 
   customEvent(name: string, meta?: object): void {
     try {
-      window.PokiSDK?.customEvent?.(name, meta);
+      const sep = name.indexOf('_');
+      const noun = sep >= 0 ? name.slice(0, sep) : name;
+      const verb = sep >= 0 ? name.slice(sep + 1) : 'event';
+      window.PokiSDK?.customEvent?.(noun, verb, '', meta || {});
     } catch {
       /* noop */
     }

@@ -73,8 +73,10 @@
         display: block;
         image-rendering: auto;
         image-rendering: -webkit-optimize-contrast;
-        max-width: 100%;
-        max-height: 100%;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain;
+        background: var(--bg);
       }
 
       /* ── LOADING OVERLAY ── */
@@ -231,6 +233,8 @@
         var pctEl = document.getElementById("hg-pct");
         var statusEl = document.getElementById("hg-status");
         var current = 0;
+        var startedAt = Date.now();
+        var MIN_SHOW_MS = 1100;
 
         function setProgress(pct, status) {
           pct = Math.max(current, Math.min(100, pct));
@@ -247,12 +251,14 @@
 
         window.addEventListener("fpp:ready", function () {
           setProgress(100, "Ready");
+          var elapsed = Date.now() - startedAt;
+          var hold = Math.max(250, MIN_SHOW_MS - elapsed);
           setTimeout(function () {
             loading.classList.add("fade-out");
             setTimeout(function () {
               loading.style.display = "none";
             }, 600);
-          }, 250);
+          }, hold);
         });
 
         // Initial paint so user sees bar move while bundle parses.

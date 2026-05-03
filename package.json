@@ -11,7 +11,8 @@
     "validate-levels": "tsx scripts/validate-levels.ts",
     "bake-levels": "tsx scripts/bake-levels.ts",
     "package:poki": "npm run build && cd dist && zip -r ../submission/poki-build.zip . && cd ..",
-    "package:crazygames": "npm run build && cd dist && zip -r ../submission/crazygames-build.zip . && cd .."
+    "package:crazygames": "npm run build && cd dist && zip -r ../submission/crazygames-build.zip . && cd ..",
+    "package:itch": "tsx scripts/package-itch.ts"
   },
   "keywords": [
     "phaser",

@@ -43,9 +43,30 @@ function patchTextResolution(): void {
   } as typeof factoryProto.text;
 }
 
+function emitProgress(pct: number, status: string): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('fpp:progress', { detail: { pct, status } }));
+}
+
+function emitReady(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event('fpp:ready'));
+}
+
 window.addEventListener('load', async () => {
+  emitProgress(20, 'Initializing...');
   patchTextResolution();
-  await Promise.all([SDKManager.init(), waitForFonts()]);
+
+  emitProgress(35, 'Connecting SDK...');
+  const sdkPromise = SDKManager.init().then(() => emitProgress(60, 'Loading fonts...'));
+  const fontPromise = waitForFonts().then(() => emitProgress(75, 'Preparing assets...'));
+  await Promise.all([sdkPromise, fontPromise]);
+
+  emitProgress(90, 'Starting game...');
   Analytics.log('session_start', { platform: SDKManager.getPlatform() });
-  new Phaser.Game(gameConfig);
+  const game = new Phaser.Game(gameConfig);
+
+  game.events.once('ready', () => emitReady());
+  // Fallback: emit ready when first scene becomes active.
+  game.events.once(Phaser.Core.Events.STEP, () => emitReady());
 });

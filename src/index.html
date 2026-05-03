@@ -1,75 +1,259 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#0d1117" />
-  <title>Fixed Platform Puzzle</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d1117" />
+    <title>Fixed Platform Puzzle</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bungee&family=DM+Sans:wght@400;500&family=Space+Mono:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      background: #0d1117;
-      color: #e5e7eb;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      -webkit-tap-highlight-color: transparent;
-      overflow: hidden;
-    }
+      :root {
+        --brand: #ffcc44;
+        --brand-ring: rgba(255, 204, 68, 0.2);
+        --bg: #0d1117;
+        --surface: #1a1f2e;
+        --border: rgba(255, 255, 255, 0.07);
+        --text: #ffffff;
+        --text-muted: rgba(255, 255, 255, 0.42);
+        --font-mono: "Space Mono", monospace;
+        --font-body: "DM Sans", sans-serif;
+        --font-display: "Bungee", "Arial Black", sans-serif;
+      }
 
-    body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-    }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        overflow: hidden;
+        font-family: var(--font-body);
+        -webkit-tap-highlight-color: transparent;
+      }
 
-    .game-frame {
-      width: 100%;
-      height: 100%;
-      background: #0d1117;
-      overflow: hidden;
-      touch-action: none;
-    }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+      }
 
-    #game {
-      width: 100%;
-      height: 100%;
-    }
+      .game-frame {
+        width: 100%;
+        height: 100%;
+        background: var(--bg);
+        overflow: hidden;
+        touch-action: none;
+      }
 
-    canvas {
-      display: block;
-      image-rendering: auto;
-      image-rendering: -webkit-optimize-contrast;
-      max-width: 100%;
-      max-height: 100%;
-    }
-  </style>
-  <script>
-    (function loadSDK(src){
-      var s = document.createElement('script');
-      s.src = src;
-      s.async = true;
-      s.onerror = function(){ console.info('[SDK] not loaded:', src); };
-      document.head.appendChild(s);
-    })(
-      location.hostname.indexOf('crazygames') !== -1
-        ? 'https://sdk.crazygames.com/crazygames-sdk-v3.js'
-        : 'https://game-cdn.poki.com/scripts/v2/poki-sdk.js'
-    );
-  </script>
-</head>
-<body>
-  <div class="game-frame">
-    <div id="game"></div>
-  </div>
-</body>
+      #game {
+        width: 100%;
+        height: 100%;
+      }
+
+      canvas {
+        display: block;
+        image-rendering: auto;
+        image-rendering: -webkit-optimize-contrast;
+        max-width: 100%;
+        max-height: 100%;
+      }
+
+      /* ── LOADING OVERLAY ── */
+      #hg-loading {
+        position: fixed;
+        inset: 0;
+        background: var(--bg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 36px;
+        z-index: 100;
+        transition: opacity 0.55s ease;
+      }
+
+      #hg-loading.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .hg-brand {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        animation: hgUp 0.5s ease both;
+      }
+
+      .hg-logo-img {
+        width: 180px;
+        height: auto;
+        object-fit: contain;
+      }
+
+      .hg-title {
+        font-family: var(--font-display);
+        font-size: 22px;
+        color: var(--brand);
+        letter-spacing: 1.5px;
+        text-align: center;
+      }
+
+      .hg-sub {
+        font-size: 11px;
+        color: var(--text-muted);
+        letter-spacing: 2.5px;
+        text-transform: uppercase;
+      }
+
+      .hg-progress {
+        width: 240px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        animation: hgUp 0.5s 0.1s ease both;
+      }
+
+      .hg-bar-bg {
+        width: 100%;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 99px;
+        overflow: hidden;
+      }
+
+      .hg-bar-fill {
+        height: 100%;
+        width: 0%;
+        background: var(--brand);
+        border-radius: 99px;
+        transition: width 0.25s ease;
+        box-shadow: 0 0 12px var(--brand-ring);
+      }
+
+      .hg-bar-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .hg-status {
+        font-size: 11px;
+        color: var(--text-muted);
+        letter-spacing: 0.4px;
+      }
+
+      .hg-pct {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--brand);
+      }
+
+      @keyframes hgUp {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+    <script>
+      (function loadSDK(src) {
+        var s = document.createElement("script");
+        s.src = src;
+        s.async = true;
+        s.onerror = function () {
+          console.info("[SDK] not loaded:", src);
+        };
+        document.head.appendChild(s);
+      })(
+        location.hostname.indexOf("crazygames") !== -1
+          ? "https://sdk.crazygames.com/crazygames-sdk-v3.js"
+          : "https://game-cdn.poki.com/scripts/v2/poki-sdk.js"
+      );
+    </script>
+  </head>
+  <body>
+    <div class="game-frame">
+      <div id="game"></div>
+    </div>
+
+    <div id="hg-loading">
+      <div class="hg-brand">
+        <img
+          class="hg-logo-img"
+          src="TemplateData/logo.png"
+          alt="Haven Grind"
+          onerror="this.style.display='none'"
+        />
+        <div class="hg-title">FIXED PLATFORM PUZZLE</div>
+        <div class="hg-sub">Loading game</div>
+      </div>
+
+      <div class="hg-progress">
+        <div class="hg-bar-bg">
+          <div class="hg-bar-fill" id="hg-fill"></div>
+        </div>
+        <div class="hg-bar-meta">
+          <div class="hg-status" id="hg-status">Initializing...</div>
+          <div class="hg-pct" id="hg-pct">0%</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var loading = document.getElementById("hg-loading");
+        var fill = document.getElementById("hg-fill");
+        var pctEl = document.getElementById("hg-pct");
+        var statusEl = document.getElementById("hg-status");
+        var current = 0;
+
+        function setProgress(pct, status) {
+          pct = Math.max(current, Math.min(100, pct));
+          current = pct;
+          fill.style.width = pct + "%";
+          pctEl.textContent = Math.round(pct) + "%";
+          if (status) statusEl.textContent = status;
+        }
+
+        window.addEventListener("fpp:progress", function (e) {
+          var d = e.detail || {};
+          if (typeof d.pct === "number") setProgress(d.pct, d.status);
+        });
+
+        window.addEventListener("fpp:ready", function () {
+          setProgress(100, "Ready");
+          setTimeout(function () {
+            loading.classList.add("fade-out");
+            setTimeout(function () {
+              loading.style.display = "none";
+            }, 600);
+          }, 250);
+        });
+
+        // Initial paint so user sees bar move while bundle parses.
+        setProgress(8, "Loading scripts...");
+      })();
+    </script>
+  </body>
 </html>

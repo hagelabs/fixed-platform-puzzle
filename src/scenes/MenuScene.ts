@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { SCENE_KEYS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
+import { AudioManager } from '../managers/AudioManager';
+import { fadeIn, fadeOutAndStart } from '../utils/Effects';
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -8,6 +10,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    fadeIn(this);
     const { width, height } = this.scale;
     const cx = width / 2;
 
@@ -33,11 +36,11 @@ export class MenuScene extends Phaser.Scene {
 
     this.makeButton(cx, height * 0.45, 'PLAY', () => {
       useGameStore.getState().setCurrentLevel(store.unlockedLevel);
-      this.scene.start(SCENE_KEYS.Game);
+      fadeOutAndStart(this, SCENE_KEYS.Game);
     });
 
     this.makeButton(cx, height * 0.55, 'LEVEL SELECT', () => {
-      this.scene.start(SCENE_KEYS.LevelSelect);
+      fadeOutAndStart(this, SCENE_KEYS.LevelSelect);
     });
 
     if (store.unlockedLevel > 1) {
@@ -46,6 +49,21 @@ export class MenuScene extends Phaser.Scene {
         this.scene.restart();
       });
     }
+
+    const audioLabel = () => `🔊 ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
+    const muteTxt = this.add
+      .text(width - 30, 30, audioLabel(), {
+        fontFamily: 'Arial',
+        fontSize: '24px',
+        color: '#cccccc',
+      })
+      .setOrigin(1, 0)
+      .setInteractive({ useHandCursor: true });
+    muteTxt.on('pointerup', () => {
+      useGameStore.getState().toggleAudio();
+      muteTxt.setText(audioLabel());
+      AudioManager.uiTap();
+    });
 
     this.add
       .text(cx, height - 60, `Unlocked: Level ${store.unlockedLevel} · Score ${store.totalScore}`, {
@@ -78,6 +96,7 @@ export class MenuScene extends Phaser.Scene {
     bg.on('pointerup', () => {
       txt.setScale(1);
       bg.setScale(1);
+      AudioManager.uiTap();
       onClick();
     });
   }

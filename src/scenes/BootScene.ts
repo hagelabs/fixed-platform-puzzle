@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SCENE_KEYS } from '../config/Constants';
+import { SDKManager } from '../managers/SDKManager';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -7,6 +8,10 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.scene.start(SCENE_KEYS.Menu);
+    SDKManager.loadingFinished();
+    this.cameras.main.fadeOut(200, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start(SCENE_KEYS.Menu);
+    });
   }
 }

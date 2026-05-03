@@ -13,6 +13,8 @@
       height: 100%;
       background: #1a1a1a;
       overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
     }
     #game {
       width: 100%;
@@ -25,6 +27,19 @@
       display: block;
     }
   </style>
+  <script>
+    (function loadSDK(src){
+      var s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onerror = function(){ console.info('[SDK] not loaded:', src); };
+      document.head.appendChild(s);
+    })(
+      location.hostname.indexOf('crazygames') !== -1
+        ? 'https://sdk.crazygames.com/crazygames-sdk-v3.js'
+        : 'https://game-cdn.poki.com/scripts/v2/poki-sdk.js'
+    );
+  </script>
 </head>
 <body>
   <div id="game"></div>

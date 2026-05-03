@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { SCENE_KEYS, TOTAL_LEVELS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
+import { AudioManager } from '../managers/AudioManager';
+import { AdManager } from '../managers/AdManager';
+import { confetti, fadeIn, fadeOutAndStart } from '../utils/Effects';
 
 interface GameOverData {
   result: 'WIN' | 'STUCK';
@@ -12,6 +15,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   create(data: GameOverData): void {
+    fadeIn(this);
     const { width, height } = this.scale;
     const cx = width / 2;
     const cy = height / 2;
@@ -19,6 +23,7 @@ export class GameOverScene extends Phaser.Scene {
     const store = useGameStore.getState();
 
     this.cameras.main.setBackgroundColor('#1a1a1a');
+    if (win) confetti(this);
 
     this.add.rectangle(cx, cy, width, height, 0x000000, 0.5);
 
@@ -47,9 +52,10 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     if (win && store.currentLevel < TOTAL_LEVELS) {
-      this.makeButton(cx, cy + 20, 'NEXT LEVEL', () => {
+      this.makeButton(cx, cy + 20, 'NEXT LEVEL', async () => {
+        await AdManager.showInterstitialIfDue('level_complete');
         useGameStore.getState().setCurrentLevel(store.currentLevel + 1);
-        this.scene.start(SCENE_KEYS.Game);
+        fadeOutAndStart(this, SCENE_KEYS.Game);
       });
     } else if (win) {
       this.add
@@ -59,14 +65,19 @@ export class GameOverScene extends Phaser.Scene {
           color: '#ffcc44',
         })
         .setOrigin(0.5);
+    } else {
+      this.makeButton(cx, cy + 20, '▶ CONTINUE (AD)', async () => {
+        const ok = await AdManager.showRewarded('continue');
+        if (ok) fadeOutAndStart(this, SCENE_KEYS.Game);
+      });
     }
 
     this.makeButton(cx, cy + 120, 'RETRY', () => {
-      this.scene.start(SCENE_KEYS.Game);
+      fadeOutAndStart(this, SCENE_KEYS.Game);
     });
 
     this.makeButton(cx, cy + 220, 'MAIN MENU', () => {
-      this.scene.start(SCENE_KEYS.Menu);
+      fadeOutAndStart(this, SCENE_KEYS.Menu);
     });
   }
 
@@ -82,6 +93,9 @@ export class GameOverScene extends Phaser.Scene {
     bg.setInteractive({ useHandCursor: true });
     bg.on('pointerover', () => bg.setFillStyle(0x55a0ff));
     bg.on('pointerout', () => bg.setFillStyle(0x4488ff));
-    bg.on('pointerup', onClick);
+    bg.on('pointerup', () => {
+      AudioManager.uiTap();
+      onClick();
+    });
   }
 }

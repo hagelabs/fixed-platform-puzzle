@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS, HUD_HEIGHT } from '../config/Constants';
+import { SCENE_KEYS, HUD_HEIGHT, COLORS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { getLevel } from '../config/Levels';
 import { Grid } from '../entities/Grid';
@@ -7,6 +7,11 @@ import { Block } from '../entities/Block';
 import { InputManager } from '../managers/InputManager';
 import { MovementSystem } from '../systems/MovementSystem';
 import { Direction } from '../types/Game';
+import { AudioManager } from '../managers/AudioManager';
+import { Analytics } from '../managers/AnalyticsManager';
+import { SDKManager } from '../managers/SDKManager';
+import { AdManager } from '../managers/AdManager';
+import { burstParticles, fadeIn, fadeOutAndStart } from '../utils/Effects';
 
 export class GameScene extends Phaser.Scene {
   private grid!: Grid;
@@ -14,16 +19,19 @@ export class GameScene extends Phaser.Scene {
   private input2!: InputManager;
   private movement!: MovementSystem;
 
-  private levelText!: Phaser.GameObjects.Text;
   private movesText!: Phaser.GameObjects.Text;
+  private hintBtn!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: SCENE_KEYS.Game });
   }
 
   create(): void {
+    fadeIn(this);
     const store = useGameStore.getState();
     store.resetMoves();
+    Analytics.log('level_started', { level: store.currentLevel });
+    SDKManager.gameplayStart();
 
     this.cameras.main.setBackgroundColor('#1a1a1a');
     this.movement = new MovementSystem();
@@ -42,16 +50,19 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.drawHud();
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      SDKManager.gameplayStop();
+    });
   }
 
   private drawHud(): void {
     const { width } = this.scale;
     const store = useGameStore.getState();
 
-    const hud = this.add.rectangle(width / 2, HUD_HEIGHT / 2, width, HUD_HEIGHT, 0x111418);
-    hud.setStrokeStyle(0);
+    this.add.rectangle(width / 2, HUD_HEIGHT / 2, width, HUD_HEIGHT, 0x111418);
 
-    this.levelText = this.add
+    this.add
       .text(40, HUD_HEIGHT / 2, `Level ${store.currentLevel}`, {
         fontFamily: 'Arial',
         fontSize: '36px',
@@ -76,19 +87,66 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(1, 0.5)
       .setInteractive({ useHandCursor: true });
     pauseBtn.on('pointerup', () => {
+      AudioManager.uiTap();
       this.scene.launch(SCENE_KEYS.Pause);
       this.scene.pause();
     });
+
+    this.hintBtn = this.add
+      .text(width - 120, HUD_HEIGHT / 2, '💡', {
+        fontFamily: 'Arial',
+        fontSize: '36px',
+        color: '#ffffff',
+      })
+      .setOrigin(1, 0.5)
+      .setInteractive({ useHandCursor: true });
+    this.hintBtn.on('pointerup', () => this.requestHint());
+  }
+
+  private async requestHint(): Promise<void> {
+    AudioManager.uiTap();
+    Analytics.log('hint_used');
+    const ok = await AdManager.showRewarded('hint');
+    if (!ok) return;
+    const hintBlock = this.findHintBlock();
+    if (!hintBlock) return;
+    const ox = hintBlock.x;
+    const oy = hintBlock.y;
+    this.tweens.add({
+      targets: hintBlock,
+      scale: 1.15,
+      duration: 200,
+      yoyo: true,
+      repeat: 2,
+      onComplete: () => {
+        hintBlock.setScale(1);
+        hintBlock.x = ox;
+        hintBlock.y = oy;
+      },
+    });
+  }
+
+  private findHintBlock(): Block | null {
+    const dirs: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
+    return (
+      this.blocks.find(
+        (b) => !b.removed && dirs.some((d) => this.movement.canExit(b, this.grid, d))
+      ) ?? null
+    );
   }
 
   private handleDrag(block: Block, dir: Direction): void {
     if (block.removed) return;
     if (!this.movement.canExit(block, this.grid, dir)) {
+      AudioManager.thud();
       this.shake(block);
       return;
     }
 
+    Analytics.log('block_moved', { dir, color: block.color });
     this.grid.clear(block);
+    AudioManager.pop();
+    burstParticles(this, block.x, block.y, COLORS[block.color]);
     block.flyOff(dir, () => this.afterRemove());
 
     const store = useGameStore.getState();
@@ -121,12 +179,20 @@ export class GameScene extends Phaser.Scene {
   }
 
   private endLevel(result: 'WIN' | 'STUCK'): void {
+    const store = useGameStore.getState();
     if (result === 'WIN') {
-      useGameStore.getState().unlockNext();
-      useGameStore.getState().addScore(100);
+      AudioManager.win();
+      store.unlockNext();
+      store.addScore(100);
+      SDKManager.happytime();
+      Analytics.log('level_completed', { level: store.currentLevel, moves: store.movesThisLevel });
+    } else {
+      AudioManager.thud();
+      Analytics.log('level_failed', { level: store.currentLevel });
     }
-    this.time.delayedCall(400, () => {
-      this.scene.start(SCENE_KEYS.GameOver, { result });
+    SDKManager.gameplayStop();
+    this.time.delayedCall(500, () => {
+      fadeOutAndStart(this, SCENE_KEYS.GameOver, { result });
     });
   }
 }

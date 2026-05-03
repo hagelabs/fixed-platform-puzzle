@@ -72,7 +72,13 @@
       height: 100%;
     }
 
-    canvas { display: block; }
+    canvas {
+      display: block;
+      image-rendering: auto;
+      image-rendering: -webkit-optimize-contrast;
+      width: 100% !important;
+      height: 100% !important;
+    }
 
     .page-foot {
       font-size: 12px;

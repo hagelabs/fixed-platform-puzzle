@@ -3,6 +3,9 @@ dist/
 stats.json
 *.log
 .DS_Store
+submission/*.zip
+marketing/screenshots/*.png
+marketing/*.png
 .env
 .env.local
 .env.*.local

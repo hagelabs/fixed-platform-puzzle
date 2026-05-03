@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1f2e"/>
+      <stop offset="100%" stop-color="#0d1117"/>
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+
+  <g transform="translate(60, 110)" filter="url(#shadow)">
+    <rect x="0" y="0" width="320" height="320" rx="16" fill="#222831" stroke="#393e46" stroke-width="2"/>
+    <g stroke="#393e46" stroke-width="1" fill="none">
+      <line x1="80" y1="0" x2="80" y2="320"/>
+      <line x1="160" y1="0" x2="160" y2="320"/>
+      <line x1="240" y1="0" x2="240" y2="320"/>
+      <line x1="0" y1="80" x2="320" y2="80"/>
+      <line x1="0" y1="160" x2="320" y2="160"/>
+      <line x1="0" y1="240" x2="320" y2="240"/>
+    </g>
+
+    <rect x="6" y="6" width="148" height="68" rx="6" fill="#ff5555" stroke="#ffffff" stroke-opacity="0.35" stroke-width="3"/>
+    <rect x="166" y="6" width="68" height="148" rx="6" fill="#4488ff" stroke="#ffffff" stroke-opacity="0.35" stroke-width="3"/>
+    <rect x="246" y="6" width="68" height="68" rx="6" fill="#55cc55" stroke="#ffffff" stroke-opacity="0.35" stroke-width="3"/>
+    <rect x="6" y="86" width="68" height="148" rx="6" fill="#ffcc44" stroke="#ffffff" stroke-opacity="0.35" stroke-width="3"/>
+    <rect x="86" y="86" width="68" height="68" rx="6" fill="#aa55ff" stroke="#ffffff" stroke-opacity="0.35" stroke-width="3"/>
+    <rect x="246" y="86" width="68" height="148" rx="6" fill="#ff8844" stroke="#ffffff" stroke-opacity="0.35" stroke-width="3"/>
+    <rect x="86" y="166" width="148" height="68" rx="6" fill="#4488ff" stroke="#ffffff" stroke-opacity="0.35" stroke-width="3"/>
+    <rect x="6" y="246" width="68" height="68" rx="6" fill="#55cc55" stroke="#ffffff" stroke-opacity="0.35" stroke-width="3"/>
+    <rect x="86" y="246" width="148" height="68" rx="6" fill="#ffcc44" stroke="#ffffff" stroke-opacity="0.35" stroke-width="3"/>
+    <rect x="246" y="246" width="68" height="68" rx="6" fill="#ff5555" stroke="#ffffff" stroke-opacity="0.35" stroke-width="3"/>
+  </g>
+
+  <g transform="translate(540, 200)">
+    <text x="0" y="0" font-family="Arial, sans-serif" font-size="64" font-weight="900" fill="#ffffff">FIXED</text>
+    <text x="0" y="64" font-family="Arial, sans-serif" font-size="64" font-weight="900" fill="#ffffff">PLATFORM</text>
+    <text x="0" y="128" font-family="Arial, sans-serif" font-size="64" font-weight="900" fill="#ffcc44">PUZZLE</text>
+    <text x="0" y="180" font-family="Arial, sans-serif" font-size="22" fill="#aaaaaa">Drag · Plan · Solve</text>
+  </g>
+
+  <g transform="translate(680, 410)">
+    <line x1="0" y1="0" x2="180" y2="0" stroke="#ffcc44" stroke-width="6" stroke-linecap="round"/>
+    <polygon points="180,-12 200,0 180,12" fill="#ffcc44"/>
+  </g>
+</svg>

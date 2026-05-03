@@ -67,9 +67,16 @@ export class GameOverScene extends Phaser.Scene {
         })
         .setOrigin(0.5);
     } else {
+      let busy = false;
       this.makeButton(cx, cy - 20, '▶ CONTINUE (AD)', async () => {
-        const ok = await AdManager.showRewarded('continue');
-        if (ok) fadeOutAndStart(this, SCENE_KEYS.Game);
+        if (busy) return;
+        busy = true;
+        try {
+          const ok = await AdManager.showRewarded('continue');
+          if (ok) fadeOutAndStart(this, SCENE_KEYS.Game);
+        } finally {
+          busy = false;
+        }
       });
     }
 

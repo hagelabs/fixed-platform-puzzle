@@ -114,27 +114,40 @@ export class GameScene extends Phaser.Scene {
     this.hintBtn.on('pointerup', () => this.requestHint());
   }
 
+  private hintBusy = false;
+
   private async requestHint(): Promise<void> {
+    if (this.hintBusy) return;
+    this.hintBusy = true;
+    this.hintBtn.setAlpha(0.4);
+    this.hintBtn.disableInteractive();
+
     AudioManager.uiTap();
     Analytics.log('hint_used');
-    const ok = await AdManager.showRewarded('hint');
-    if (!ok) return;
-    const hintBlock = this.findHintBlock();
-    if (!hintBlock) return;
-    const ox = hintBlock.x;
-    const oy = hintBlock.y;
-    this.tweens.add({
-      targets: hintBlock,
-      scale: 1.15,
-      duration: 200,
-      yoyo: true,
-      repeat: 2,
-      onComplete: () => {
-        hintBlock.setScale(1);
-        hintBlock.x = ox;
-        hintBlock.y = oy;
-      },
-    });
+    try {
+      const ok = await AdManager.showRewarded('hint');
+      if (!ok) return;
+      const hintBlock = this.findHintBlock();
+      if (!hintBlock) return;
+      const ox = hintBlock.x;
+      const oy = hintBlock.y;
+      this.tweens.add({
+        targets: hintBlock,
+        scale: 1.15,
+        duration: 200,
+        yoyo: true,
+        repeat: 2,
+        onComplete: () => {
+          hintBlock.setScale(1);
+          hintBlock.x = ox;
+          hintBlock.y = oy;
+        },
+      });
+    } finally {
+      this.hintBusy = false;
+      this.hintBtn.setAlpha(1);
+      this.hintBtn.setInteractive({ useHandCursor: true });
+    }
   }
 
   private findHintBlock(): Block | null {

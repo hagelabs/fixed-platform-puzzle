@@ -28,6 +28,8 @@ interface CrazyAPI {
   };
 }
 
+declare const __BUILD_TARGET__: string;
+
 declare global {
   interface Window {
     PokiSDK?: PokiAPI;
@@ -43,6 +45,7 @@ class SDKManagerImpl {
   private adInFlight = false;
 
   detect(): Platform {
+    if (typeof __BUILD_TARGET__ !== 'undefined' && __BUILD_TARGET__ === 'itch') return 'none';
     const host = window.location.hostname;
     if (host.includes('poki') || window.PokiSDK) return 'poki';
     if (host.includes('crazygames') || window.CrazyGames) return 'crazygames';

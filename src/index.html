@@ -179,6 +179,7 @@
         }
       }
     </style>
+<% if (BUILD_TARGET !== 'itch') { %>
     <script>
       (function loadSDK(src) {
         var s = document.createElement("script");
@@ -194,6 +195,7 @@
           : "https://game-cdn.poki.com/scripts/v2/poki-sdk.js",
       );
     </script>
+<% } %>
   </head>
   <body>
     <div class="game-frame">

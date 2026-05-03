@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CompressionPlugin = require('compression-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
@@ -8,11 +9,15 @@ const zlib = require('zlib');
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
   const analyze = !!env?.analyze;
+  const buildTarget = env?.target === 'itch' ? 'itch' : 'platform';
 
   const plugins = [
     new HtmlWebpackPlugin({
       template: './src/index.html',
       inject: 'body',
+      templateParameters: {
+        BUILD_TARGET: buildTarget,
+      },
       minify: isProduction
         ? {
             collapseWhitespace: true,
@@ -21,6 +26,9 @@ module.exports = (env, argv) => {
             minifyJS: true,
           }
         : false,
+    }),
+    new webpack.DefinePlugin({
+      __BUILD_TARGET__: JSON.stringify(buildTarget),
     }),
   ];
 

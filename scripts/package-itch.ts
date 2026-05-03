@@ -12,8 +12,11 @@ const templateData = resolve(root, 'marketing', 'TemplateData');
 const outDir = resolve(root, 'submission');
 const outZip = resolve(outDir, 'itch-build.zip');
 
-console.log('[itch] running production build...');
-execSync('npm run build', { stdio: 'inherit', cwd: root });
+console.log('[itch] running production build (target=itch, no SDK)...');
+execSync('npx webpack --config webpack.config.js --mode production --env target=itch', {
+  stdio: 'inherit',
+  cwd: root,
+});
 
 if (!existsSync(distDir)) {
   console.error('[itch] dist/ missing after build');

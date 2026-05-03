@@ -3,6 +3,7 @@ import { SCENE_KEYS, FONT_HEADER } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { AudioManager } from '../managers/AudioManager';
 import { fadeIn, fadeOutAndStart } from '../utils/Effects';
+import { showConfirm } from '../utils/Confirm';
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -51,8 +52,16 @@ export class MenuScene extends Phaser.Scene {
 
     if (store.unlockedLevel > 1) {
       this.makeButton(cx, 480, 'RESET', () => {
-        useGameStore.getState().resetProgress();
-        this.scene.restart();
+        showConfirm(this, {
+          title: 'RESET PROGRESS?',
+          body: 'All unlocked levels and stars will be erased. This cannot be undone.',
+          yesLabel: 'RESET',
+          noLabel: 'CANCEL',
+          onYes: () => {
+            useGameStore.getState().resetProgress();
+            this.scene.restart();
+          },
+        });
       });
     }
 

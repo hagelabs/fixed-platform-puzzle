@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { SCENE_KEYS, FONT_HEADER } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { AudioManager } from '../managers/AudioManager';
+import { showConfirm } from '../utils/Confirm';
 
 export class PauseScene extends Phaser.Scene {
   constructor() {
@@ -35,9 +36,17 @@ export class PauseScene extends Phaser.Scene {
     });
 
     this.makeButton(cx, cy + 68, 'RESTART LEVEL', () => {
-      this.scene.stop(SCENE_KEYS.Game);
-      this.scene.stop();
-      this.scene.start(SCENE_KEYS.Game);
+      showConfirm(this, {
+        title: 'RESTART LEVEL?',
+        body: 'Your moves on this level will be lost.',
+        yesLabel: 'RESTART',
+        noLabel: 'CANCEL',
+        onYes: () => {
+          this.scene.stop(SCENE_KEYS.Game);
+          this.scene.stop();
+          this.scene.start(SCENE_KEYS.Game);
+        },
+      });
     });
 
     this.makeButton(cx, cy + 132, 'MAIN MENU', () => {

@@ -29,3 +29,6 @@ export const SCENE_KEYS = {
   Pause: 'PauseScene',
   GameOver: 'GameOverScene',
 } as const;
+
+export const FONT_HEADER = '"Bungee", "Arial Black", sans-serif';
+export const FONT_BODY = 'Arial, sans-serif';

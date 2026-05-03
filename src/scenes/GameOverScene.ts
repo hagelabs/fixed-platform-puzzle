@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS, TOTAL_LEVELS } from '../config/Constants';
+import { SCENE_KEYS, TOTAL_LEVELS, FONT_HEADER } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { AudioManager } from '../managers/AudioManager';
 import { AdManager } from '../managers/AdManager';
@@ -29,9 +29,8 @@ export class GameOverScene extends Phaser.Scene {
 
     this.add
       .text(cx, cy - 160, win ? 'LEVEL COMPLETE!' : 'STUCK!', {
-        fontFamily: 'Arial',
-        fontSize: '40px',
-        fontStyle: 'bold',
+        fontFamily: FONT_HEADER,
+        fontSize: '38px',
         color: win ? '#55cc55' : '#ff5555',
       })
       .setOrigin(0.5);

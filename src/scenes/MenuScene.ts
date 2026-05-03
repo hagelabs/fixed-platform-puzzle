@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS } from '../config/Constants';
+import { SCENE_KEYS, FONT_HEADER } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { AudioManager } from '../managers/AudioManager';
 import { fadeIn, fadeOutAndStart } from '../utils/Effects';
@@ -18,10 +18,9 @@ export class MenuScene extends Phaser.Scene {
 
     this.add
       .text(cx, 90, 'Fixed Platform Puzzle', {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '44px',
-        fontStyle: 'bold',
-        color: '#ffffff',
+        fontFamily: FONT_HEADER,
+        fontSize: '40px',
+        color: '#ffcc44',
       })
       .setOrigin(0.5);
 

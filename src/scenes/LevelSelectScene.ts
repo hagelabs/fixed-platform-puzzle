@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS, TOTAL_LEVELS } from '../config/Constants';
+import { SCENE_KEYS, TOTAL_LEVELS, FONT_HEADER } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { AudioManager } from '../managers/AudioManager';
 import { fadeIn, fadeOutAndStart } from '../utils/Effects';
@@ -18,10 +18,9 @@ export class LevelSelectScene extends Phaser.Scene {
 
     this.add
       .text(cx, 36, 'SELECT LEVEL', {
-        fontFamily: 'Arial',
-        fontSize: '28px',
-        fontStyle: 'bold',
-        color: '#ffffff',
+        fontFamily: FONT_HEADER,
+        fontSize: '26px',
+        color: '#ffcc44',
       })
       .setOrigin(0.5);
 

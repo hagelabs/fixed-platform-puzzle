@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS } from '../config/Constants';
+import { SCENE_KEYS, FONT_HEADER } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { AudioManager } from '../managers/AudioManager';
 
@@ -17,10 +17,9 @@ export class PauseScene extends Phaser.Scene {
 
     this.add
       .text(cx, cy - 140, 'PAUSED', {
-        fontFamily: 'Arial',
-        fontSize: '40px',
-        fontStyle: 'bold',
-        color: '#ffffff',
+        fontFamily: FONT_HEADER,
+        fontSize: '38px',
+        color: '#ffcc44',
       })
       .setOrigin(0.5);
 

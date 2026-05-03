@@ -61,27 +61,36 @@ export class Block extends Phaser.GameObjects.Container {
     scene.add.existing(this);
   }
 
-  private makeExitMarker(side: ExitSide, w: number, h: number): Phaser.GameObjects.Triangle {
+  private makeExitMarker(side: ExitSide, w: number, h: number): Phaser.GameObjects.Graphics {
+    const g = this.scene.add.graphics();
+    g.fillStyle(0xffffff, 0.85);
+
     const inset = 10;
-    let x = 0;
-    let y = 0;
-    let rot = 0;
+    const half = 6;
+    const len = 12;
+    const baseOff = len / 3;
+    const tipOff = (2 * len) / 3;
+
+    let cx = 0;
+    let cy = 0;
     if (side === 'TOP') {
-      y = -h / 2 + inset;
-      rot = -90;
+      cx = 0;
+      cy = -h / 2 + inset;
+      g.fillTriangle(cx - half, cy + baseOff, cx + half, cy + baseOff, cx, cy - tipOff);
     } else if (side === 'BOTTOM') {
-      y = h / 2 - inset;
-      rot = 90;
+      cx = 0;
+      cy = h / 2 - inset;
+      g.fillTriangle(cx - half, cy - baseOff, cx + half, cy - baseOff, cx, cy + tipOff);
     } else if (side === 'LEFT') {
-      x = -w / 2 + inset;
-      rot = 180;
+      cx = -w / 2 + inset;
+      cy = 0;
+      g.fillTriangle(cx + baseOff, cy - half, cx + baseOff, cy + half, cx - tipOff, cy);
     } else {
-      x = w / 2 - inset;
+      cx = w / 2 - inset;
+      cy = 0;
+      g.fillTriangle(cx - baseOff, cy - half, cx - baseOff, cy + half, cx + tipOff, cy);
     }
-    const t = this.scene.add.triangle(x, y, 0, -7, 0, 7, 11, 0, 0xffffff);
-    t.setAlpha(0.85);
-    t.setAngle(rot);
-    return t;
+    return g;
   }
 
   public moveToCell(grid: Grid, col: number, row: number, animate = true): void {

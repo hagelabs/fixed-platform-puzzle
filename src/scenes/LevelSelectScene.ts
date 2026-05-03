@@ -17,34 +17,46 @@ export class LevelSelectScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0d1117');
 
     this.add
-      .text(cx, 36, 'SELECT LEVEL', {
+      .text(cx, 30, 'SELECT LEVEL', {
         fontFamily: FONT_HEADER,
-        fontSize: '26px',
+        fontSize: '24px',
         color: '#ffcc44',
       })
       .setOrigin(0.5);
 
     const store = useGameStore.getState();
+    this.add
+      .text(cx, 56, `★ ${store.totalStars()} / ${TOTAL_LEVELS * 3}`, {
+        fontFamily: 'Arial',
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color: '#ffcc44',
+      })
+      .setOrigin(0.5);
+
     const cols = 10;
     const rows = Math.ceil(TOTAL_LEVELS / cols);
-    const tileSize = 44;
-    const gap = 8;
+    const tileSize = 42;
+    const starRowH = 12;
+    const cellH = tileSize + starRowH;
+    const gap = 6;
     const gridW = cols * tileSize + (cols - 1) * gap;
-    const gridH = rows * tileSize + (rows - 1) * gap;
+    const gridH = rows * cellH + (rows - 1) * gap;
     const startX = (width - gridW) / 2 + tileSize / 2;
-    const startY = 90 + tileSize / 2;
+    const startY = 90 + cellH / 2;
 
     for (let i = 0; i < TOTAL_LEVELS; i++) {
       const lvl = i + 1;
       const col = i % cols;
       const row = Math.floor(i / cols);
       const x = startX + col * (tileSize + gap);
-      const y = startY + row * (tileSize + gap);
+      const y = startY + row * (cellH + gap);
       const locked = lvl > store.unlockedLevel;
+      const stars = store.starsByLevel[lvl] ?? 0;
 
       const bg = this.add.rectangle(
         x,
-        y,
+        y - starRowH / 2,
         tileSize,
         tileSize,
         locked ? 0x2a2a2a : lvl === store.currentLevel ? 0x55cc55 : 0x4488ff,
@@ -52,17 +64,33 @@ export class LevelSelectScene extends Phaser.Scene {
       );
       bg.setStrokeStyle(1, 0xffffff, locked ? 0.15 : 0.5);
       this.add
-        .text(x, y, locked ? '🔒' : `${lvl}`, {
+        .text(x, y - starRowH / 2, locked ? '🔒' : `${lvl}`, {
           fontFamily: 'Arial',
-          fontSize: locked ? '16px' : '16px',
+          fontSize: '14px',
           fontStyle: 'bold',
           color: '#ffffff',
         })
         .setOrigin(0.5);
 
+      // Star row under tile
+      if (!locked) {
+        for (let s = 0; s < 3; s++) {
+          const filled = s < stars;
+          this.add
+            .text(x - 12 + s * 12, y + tileSize / 2 - 2, '★', {
+              fontFamily: 'Arial',
+              fontSize: '11px',
+              color: filled ? '#ffcc44' : '#3a3a3a',
+            })
+            .setOrigin(0.5);
+        }
+      }
+
       if (!locked) {
         bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerover', () => bg.setFillStyle(lvl === store.currentLevel ? 0x66dd66 : 0x55a0ff));
+        bg.on('pointerover', () =>
+          bg.setFillStyle(lvl === store.currentLevel ? 0x66dd66 : 0x55a0ff)
+        );
         bg.on('pointerout', () =>
           bg.setFillStyle(lvl === store.currentLevel ? 0x55cc55 : 0x4488ff)
         );
@@ -74,11 +102,11 @@ export class LevelSelectScene extends Phaser.Scene {
       }
     }
 
-    const backY = startY + gridH + 30;
+    const backY = startY + gridH + 20;
     const back = this.add
-      .text(cx, Math.min(backY, height - 30), '< BACK', {
+      .text(cx, Math.min(backY, height - 24), '< BACK', {
         fontFamily: 'Arial',
-        fontSize: '20px',
+        fontSize: '18px',
         color: '#aaaaaa',
       })
       .setOrigin(0.5)

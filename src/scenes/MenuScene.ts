@@ -73,11 +73,16 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.add
-      .text(cx, height - 24, `Unlocked: Level ${store.unlockedLevel} · Score ${store.totalScore}`, {
-        fontFamily: 'Arial',
-        fontSize: '14px',
-        color: '#6b7280',
-      })
+      .text(
+        cx,
+        height - 24,
+        `Unlocked: Level ${store.unlockedLevel} · ★ ${store.totalStars()} / ${50 * 3}`,
+        {
+          fontFamily: 'Arial',
+          fontSize: '14px',
+          color: '#6b7280',
+        }
+      )
       .setOrigin(0.5);
   }
 

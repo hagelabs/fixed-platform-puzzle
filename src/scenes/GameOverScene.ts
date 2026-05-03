@@ -50,18 +50,10 @@ export class GameOverScene extends Phaser.Scene {
     }
 
     this.add
-      .text(cx, cy - 80, `Level ${store.currentLevel} · Moves ${store.movesThisLevel}`, {
+      .text(cx, cy - 70, `Level ${store.currentLevel} · Moves ${store.movesThisLevel}`, {
         fontFamily: 'Arial',
         fontSize: '16px',
         color: '#cccccc',
-      })
-      .setOrigin(0.5);
-
-    this.add
-      .text(cx, cy - 56, `Total Score: ${store.totalScore}`, {
-        fontFamily: 'Arial',
-        fontSize: '14px',
-        color: '#888888',
       })
       .setOrigin(0.5);
 

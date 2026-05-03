@@ -240,7 +240,6 @@ export class GameScene extends Phaser.Scene {
     this.grid.clear(block);
     AudioManager.pop();
     burstParticles(this, block.x, block.y, COLORS[block.color]);
-    store.addScore(20);
     block.flyOff(dir, () => this.afterRemove());
     this.events.emit('tutorial:moved');
   }
@@ -293,7 +292,6 @@ export class GameScene extends Phaser.Scene {
       stars = this.computeStars();
       AudioManager.win();
       store.unlockNext();
-      store.addScore(100 * stars);
       store.recordStars(store.currentLevel, stars);
       SDKManager.happytime();
       Analytics.log('level_completed', {

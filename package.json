@@ -8,6 +8,8 @@
     "build": "webpack --config webpack.config.js --mode production",
     "analyze": "webpack --config webpack.config.js --mode production --env analyze",
     "size": "du -sh dist/ && ls -lh dist/",
+    "validate-levels": "tsx scripts/validate-levels.ts",
+    "bake-levels": "tsx scripts/bake-levels.ts",
     "package:poki": "npm run build && cd dist && zip -r ../submission/poki-build.zip . && cd ..",
     "package:crazygames": "npm run build && cd dist && zip -r ../submission/crazygames-build.zip . && cd .."
   },

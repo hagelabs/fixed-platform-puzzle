@@ -44,6 +44,7 @@ export class GameScene extends Phaser.Scene {
     SDKManager.gameplayStart();
 
     this.cameras.main.setBackgroundColor('#0d1117');
+    this.drawBackground();
     this.movement = new MovementSystem();
 
     const levelData = getLevel(store.currentLevel);
@@ -72,6 +73,42 @@ export class GameScene extends Phaser.Scene {
         this.scene.stop(SCENE_KEYS.Tutorial);
       }
     });
+  }
+
+  private drawBackground(): void {
+    const { width, height } = this.scale;
+
+    // Diagonal hatch — subtle texture
+    const hatch = this.add.graphics();
+    hatch.lineStyle(1, 0x2d3548, 0.35);
+    const step = 28;
+    for (let i = -height; i < width + height; i += step) {
+      hatch.beginPath();
+      hatch.moveTo(i, 0);
+      hatch.lineTo(i + height, height);
+      hatch.strokePath();
+    }
+
+    // Coarse dot grid — accent depth
+    const dots = this.add.graphics();
+    dots.fillStyle(0xffcc44, 0.06);
+    const dotSpacing = 56;
+    for (let y = dotSpacing / 2; y < height; y += dotSpacing) {
+      for (let x = dotSpacing / 2; x < width; x += dotSpacing) {
+        dots.fillCircle(x, y, 2.5);
+      }
+    }
+
+    // Soft vignette via 4 edge gradients (alpha rectangles)
+    const vignette = this.add.graphics();
+    const vsteps = 12;
+    const vmax = 0.35;
+    for (let i = 0; i < vsteps; i++) {
+      const a = vmax * (1 - i / vsteps);
+      const inset = i * 4;
+      vignette.lineStyle(2, 0x000000, a);
+      vignette.strokeRect(inset, inset, width - inset * 2, height - inset * 2);
+    }
   }
 
   private drawHud(): void {

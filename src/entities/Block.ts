@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BlockData, Color } from '../types/Game';
+import { BlockData, Color, BlockType, ExitSide } from '../types/Game';
 import { COLORS } from '../config/Constants';
 import { Grid } from './Grid';
 
@@ -8,6 +8,8 @@ export class Block extends Phaser.GameObjects.Container {
   public readonly color: Color;
   public gridPos: [number, number];
   public readonly size: [number, number];
+  public readonly type: BlockType;
+  public readonly allowedExits: ExitSide[];
   public removed = false;
 
   private rect: Phaser.GameObjects.Rectangle;
@@ -23,28 +25,79 @@ export class Block extends Phaser.GameObjects.Container {
     this.color = data.color;
     this.gridPos = [c, r];
     this.size = [w, h];
+    this.type = data.type ?? 'simple';
+    this.allowedExits = data.allowedExits ?? ['TOP', 'BOTTOM', 'LEFT', 'RIGHT'];
 
     const pxW = w * grid.cellSize - 6;
     const pxH = h * grid.cellSize - 6;
-    this.rect = scene.add.rectangle(0, 0, pxW, pxH, COLORS[data.color]);
-    this.rect.setStrokeStyle(2, 0xffffff, 0.4);
-    this.add(this.rect);
+
+    if (this.type === 'obstacle') {
+      this.rect = scene.add.rectangle(0, 0, pxW, pxH, 0x404858);
+      this.rect.setStrokeStyle(2, 0x6b7280, 0.6);
+      const x1 = scene.add.line(0, 0, -pxW / 2 + 6, -pxH / 2 + 6, pxW / 2 - 6, pxH / 2 - 6, 0x6b7280);
+      const x2 = scene.add.line(0, 0, -pxW / 2 + 6, pxH / 2 - 6, pxW / 2 - 6, -pxH / 2 + 6, 0x6b7280);
+      this.add([this.rect, x1, x2]);
+    } else {
+      this.rect = scene.add.rectangle(0, 0, pxW, pxH, COLORS[data.color]);
+      this.rect.setStrokeStyle(2, 0xffffff, 0.4);
+      this.add(this.rect);
+
+      if (data.allowedExits && data.allowedExits.length < 4) {
+        for (const side of data.allowedExits) {
+          this.add(this.makeExitMarker(side, pxW, pxH));
+        }
+      }
+    }
 
     this.setSize(pxW, pxH);
-    this.setInteractive({ useHandCursor: true });
+    if (this.type === 'simple') this.setInteractive({ useHandCursor: true });
     scene.add.existing(this);
   }
 
-  public moveToCell(grid: Grid, col: number, row: number): void {
+  private makeExitMarker(side: ExitSide, w: number, h: number): Phaser.GameObjects.Triangle {
+    let x = 0;
+    let y = 0;
+    let rot = 0;
+    if (side === 'TOP') {
+      y = -h / 2 + 6;
+      rot = -90;
+    } else if (side === 'BOTTOM') {
+      y = h / 2 - 6;
+      rot = 90;
+    } else if (side === 'LEFT') {
+      x = -w / 2 + 6;
+      rot = 180;
+    } else {
+      x = w / 2 - 6;
+    }
+    const t = this.scene.add.triangle(x, y, 0, -3, 0, 3, 5, 0, 0xffffff);
+    t.setAlpha(0.7);
+    t.setAngle(rot);
+    return t;
+  }
+
+  public moveToCell(grid: Grid, col: number, row: number, animate = true): void {
     this.gridPos = [col, row];
     const [w, h] = this.size;
-    this.x = grid.worldX(col) + ((w - 1) * grid.cellSize) / 2;
-    this.y = grid.worldY(row) + ((h - 1) * grid.cellSize) / 2;
+    const tx = grid.worldX(col) + ((w - 1) * grid.cellSize) / 2;
+    const ty = grid.worldY(row) + ((h - 1) * grid.cellSize) / 2;
+    if (animate) {
+      this.scene.tweens.add({
+        targets: this,
+        x: tx,
+        y: ty,
+        duration: 140,
+        ease: 'Cubic.easeOut',
+      });
+    } else {
+      this.x = tx;
+      this.y = ty;
+    }
   }
 
   public flyOff(direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT', onDone: () => void): void {
     this.disableInteractive();
-    const dist = 400;
+    const dist = 320;
     const dx = direction === 'LEFT' ? -dist : direction === 'RIGHT' ? dist : 0;
     const dy = direction === 'UP' ? -dist : direction === 'DOWN' ? dist : 0;
     this.scene.tweens.add({
@@ -52,13 +105,23 @@ export class Block extends Phaser.GameObjects.Container {
       x: this.x + dx,
       y: this.y + dy,
       alpha: 0,
-      duration: 280,
+      duration: 240,
       ease: 'Cubic.easeIn',
       onComplete: () => {
         this.removed = true;
         onDone();
         this.destroy();
       },
+    });
+  }
+
+  public pulseRed(): void {
+    this.scene.tweens.add({
+      targets: this.rect,
+      alpha: { from: 0.4, to: 1 },
+      duration: 250,
+      yoyo: true,
+      repeat: 2,
     });
   }
 }

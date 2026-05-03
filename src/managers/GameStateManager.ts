@@ -9,6 +9,7 @@ interface GameState {
   movesThisLevel: number;
   audioEnabled: boolean;
   tutorialDone: boolean;
+  starsByLevel: Record<number, number>;
 
   setCurrentLevel: (n: number) => void;
   unlockNext: () => void;
@@ -17,6 +18,7 @@ interface GameState {
   resetMoves: () => void;
   toggleAudio: () => void;
   setTutorialDone: (v: boolean) => void;
+  recordStars: (level: number, stars: number) => void;
   resetProgress: () => void;
 }
 
@@ -29,6 +31,7 @@ const store = createStore<GameState>()(
       movesThisLevel: 0,
       audioEnabled: true,
       tutorialDone: false,
+      starsByLevel: {},
 
       setCurrentLevel: (n) => set({ currentLevel: n, movesThisLevel: 0 }),
       unlockNext: () =>
@@ -40,8 +43,12 @@ const store = createStore<GameState>()(
       resetMoves: () => set({ movesThisLevel: 0 }),
       toggleAudio: () => set((s) => ({ audioEnabled: !s.audioEnabled })),
       setTutorialDone: (v) => set({ tutorialDone: v }),
+      recordStars: (level, stars) =>
+        set((s) => ({
+          starsByLevel: { ...s.starsByLevel, [level]: Math.max(s.starsByLevel[level] ?? 0, stars) },
+        })),
       resetProgress: () =>
-        set({ currentLevel: 1, unlockedLevel: 1, totalScore: 0, movesThisLevel: 0, tutorialDone: false }),
+        set({ currentLevel: 1, unlockedLevel: 1, totalScore: 0, movesThisLevel: 0, tutorialDone: false, starsByLevel: {} }),
     }),
     {
       name: 'fpp-game-state',
@@ -52,6 +59,7 @@ const store = createStore<GameState>()(
         totalScore: s.totalScore,
         audioEnabled: s.audioEnabled,
         tutorialDone: s.tutorialDone,
+        starsByLevel: s.starsByLevel,
       }) as Partial<GameState>,
     }
   )

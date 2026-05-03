@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CELL_SIZE } from '../config/Constants';
 import { Block } from './Block';
+import { ExitZone } from '../types/Game';
 
 export class Grid {
   public readonly cols: number;
@@ -10,10 +11,12 @@ export class Grid {
   public readonly cellSize: number;
 
   private occupancy: (Block | null)[][];
+  private exits: ExitZone[] = [];
 
-  constructor(scene: Phaser.Scene, cols: number, rows: number) {
+  constructor(scene: Phaser.Scene, cols: number, rows: number, exits: ExitZone[] = []) {
     this.cols = cols;
     this.rows = rows;
+    this.exits = exits;
 
     const screenW = scene.scale.width;
     const screenH = scene.scale.height;
@@ -24,10 +27,11 @@ export class Grid {
     const boardW = this.cellSize * cols;
     const boardH = this.cellSize * rows;
     this.originX = (screenW - boardW) / 2;
-    this.originY = 80 + ((screenH - 80 - boardH) / 2);
+    this.originY = 80 + (screenH - 80 - boardH) / 2;
 
     this.occupancy = Array.from({ length: rows }, () => Array(cols).fill(null));
     this.drawBoard(scene);
+    this.drawExits(scene);
   }
 
   private drawBoard(scene: Phaser.Scene) {
@@ -48,6 +52,44 @@ export class Grid {
           this.originY + r * this.cellSize,
           this.cellSize,
           this.cellSize
+        );
+      }
+    }
+  }
+
+  private drawExits(scene: Phaser.Scene): void {
+    const thickness = 4;
+    const g = scene.add.graphics();
+    g.fillStyle(0xffcc44, 0.6);
+
+    for (const e of this.exits) {
+      if (e.side === 'TOP') {
+        g.fillRect(
+          this.originX + e.index * this.cellSize + 4,
+          this.originY - thickness,
+          this.cellSize - 8,
+          thickness
+        );
+      } else if (e.side === 'BOTTOM') {
+        g.fillRect(
+          this.originX + e.index * this.cellSize + 4,
+          this.originY + this.rows * this.cellSize,
+          this.cellSize - 8,
+          thickness
+        );
+      } else if (e.side === 'LEFT') {
+        g.fillRect(
+          this.originX - thickness,
+          this.originY + e.index * this.cellSize + 4,
+          thickness,
+          this.cellSize - 8
+        );
+      } else {
+        g.fillRect(
+          this.originX + this.cols * this.cellSize,
+          this.originY + e.index * this.cellSize + 4,
+          thickness,
+          this.cellSize - 8
         );
       }
     }
@@ -88,5 +130,9 @@ export class Grid {
 
   public isEmpty(col: number, row: number): boolean {
     return this.getOccupant(col, row) === null;
+  }
+
+  public hasExit(side: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT', index: number): boolean {
+    return this.exits.some((e) => e.side === side && e.index === index);
   }
 }

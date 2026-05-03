@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS, HUD_HEIGHT, COLORS } from '../config/Constants';
+import { SCENE_KEYS, HUD_HEIGHT, COLORS, FONT_HEADER } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { getLevel } from '../config/Levels';
 import { Grid } from '../entities/Grid';
 import { Block } from '../entities/Block';
 import { InputManager } from '../managers/InputManager';
 import { MovementSystem } from '../systems/MovementSystem';
-import { Direction } from '../types/Game';
+import { Direction, MoveHistoryEntry } from '../types/Game';
 import { AudioManager } from '../managers/AudioManager';
 import { Analytics } from '../managers/AnalyticsManager';
 import { SDKManager } from '../managers/SDKManager';
@@ -18,9 +18,15 @@ export class GameScene extends Phaser.Scene {
   private blocks: Block[] = [];
   private input2!: InputManager;
   private movement!: MovementSystem;
+  private history: MoveHistoryEntry[] = [];
+  private optimalMoves = 1;
 
   private movesText!: Phaser.GameObjects.Text;
   private hintBtn!: Phaser.GameObjects.Text;
+  private undoBtn!: Phaser.GameObjects.Text;
+  private deadEndShown = false;
+
+  private hintBusy = false;
 
   constructor() {
     super({ key: SCENE_KEYS.Game });
@@ -30,17 +36,19 @@ export class GameScene extends Phaser.Scene {
     fadeIn(this);
     const store = useGameStore.getState();
     store.resetMoves();
+    this.history = [];
+    this.deadEndShown = false;
     Analytics.log('level_started', { level: store.currentLevel });
 
-    // Poki spec: commercialBreak() called BEFORE gameplayStart() at natural breaks.
     await AdManager.preLevelInterstitial();
     SDKManager.gameplayStart();
 
-    this.cameras.main.setBackgroundColor('#1a1a1a');
+    this.cameras.main.setBackgroundColor('#0d1117');
     this.movement = new MovementSystem();
 
     const levelData = getLevel(store.currentLevel);
-    this.grid = new Grid(this, levelData.cols, levelData.rows);
+    this.optimalMoves = levelData.optimalMoves;
+    this.grid = new Grid(this, levelData.cols, levelData.rows, levelData.exits);
 
     this.blocks = [];
     this.input2 = new InputManager(this, (block, dir) => this.handleDrag(block, dir));
@@ -48,7 +56,7 @@ export class GameScene extends Phaser.Scene {
     levelData.blocks.forEach((bd) => {
       const block = new Block(this, bd, this.grid);
       this.grid.place(block);
-      this.input2.attach(block);
+      if (block.type === 'simple') this.input2.attach(block);
       this.blocks.push(block);
     });
 
@@ -74,15 +82,14 @@ export class GameScene extends Phaser.Scene {
 
     this.add
       .text(16, HUD_HEIGHT / 2, `Level ${store.currentLevel}`, {
-        fontFamily: 'Arial',
+        fontFamily: FONT_HEADER,
         fontSize: '20px',
-        fontStyle: 'bold',
-        color: '#ffffff',
+        color: '#ffcc44',
       })
       .setOrigin(0, 0.5);
 
     this.movesText = this.add
-      .text(width / 2, HUD_HEIGHT / 2, `Moves: 0`, {
+      .text(width / 2, HUD_HEIGHT / 2, `Moves: 0 / ${this.optimalMoves}`, {
         fontFamily: 'Arial',
         fontSize: '18px',
         color: '#cccccc',
@@ -112,9 +119,17 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(1, 0.5)
       .setInteractive({ useHandCursor: true });
     this.hintBtn.on('pointerup', () => this.requestHint());
-  }
 
-  private hintBusy = false;
+    this.undoBtn = this.add
+      .text(width - 96, HUD_HEIGHT / 2, '↶', {
+        fontFamily: 'Arial',
+        fontSize: '24px',
+        color: '#888888',
+      })
+      .setOrigin(1, 0.5)
+      .setInteractive({ useHandCursor: true });
+    this.undoBtn.on('pointerup', () => this.undo());
+  }
 
   private async requestHint(): Promise<void> {
     if (this.hintBusy) return;
@@ -127,20 +142,23 @@ export class GameScene extends Phaser.Scene {
     try {
       const ok = await AdManager.showRewarded('hint');
       if (!ok) return;
-      const hintBlock = this.findHintBlock();
-      if (!hintBlock) return;
-      const ox = hintBlock.x;
-      const oy = hintBlock.y;
+
+      const exitMove = this.movement.findAnyExit(this.blocks, this.grid);
+      const target = exitMove?.block ?? this.findFirstMovable();
+      if (!target) return;
+
+      const ox = target.x;
+      const oy = target.y;
       this.tweens.add({
-        targets: hintBlock,
+        targets: target,
         scale: 1.15,
         duration: 200,
         yoyo: true,
         repeat: 2,
         onComplete: () => {
-          hintBlock.setScale(1);
-          hintBlock.x = ox;
-          hintBlock.y = oy;
+          target.setScale(1);
+          target.x = ox;
+          target.y = oy;
         },
       });
     } finally {
@@ -150,33 +168,80 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private findHintBlock(): Block | null {
+  private findFirstMovable(): Block | null {
     const dirs: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
     return (
       this.blocks.find(
-        (b) => !b.removed && dirs.some((d) => this.movement.canExit(b, this.grid, d))
+        (b) => !b.removed && b.type === 'simple' && dirs.some((d) => this.movement.attempt(b, this.grid, d).kind !== 'invalid')
       ) ?? null
     );
   }
 
+  private undo(): void {
+    if (this.history.length === 0) {
+      AudioManager.thud();
+      return;
+    }
+    const entry = this.history.pop()!;
+    if (entry.removed) {
+      // Cannot undo a removed block (already destroyed). Skip removed entries — find prev slide entry.
+      AudioManager.thud();
+      return;
+    }
+    const block = this.blocks.find((b) => b.blockId === entry.blockId);
+    if (!block || block.removed) return;
+
+    this.grid.clear(block);
+    block.gridPos = entry.prevPos;
+    this.grid.place(block);
+    block.moveToCell(this.grid, entry.prevPos[0], entry.prevPos[1], true);
+    AudioManager.uiTap();
+    Analytics.log('hint_used', { type: 'undo' });
+  }
+
   private handleDrag(block: Block, dir: Direction): void {
-    if (block.removed) return;
-    if (!this.movement.canExit(block, this.grid, dir)) {
+    if (block.removed || block.type !== 'simple') return;
+    const result = this.movement.attempt(block, this.grid, dir);
+
+    if (result.kind === 'invalid') {
       AudioManager.thud();
       this.shake(block);
+      Analytics.log('hint_used', { invalid: result.reason });
       return;
     }
 
-    Analytics.log('block_moved', { dir, color: block.color });
+    Analytics.log('block_moved', { dir, color: block.color, kind: result.kind });
+    const store = useGameStore.getState();
+    store.incMoves();
+    this.movesText.setText(`Moves: ${useGameStore.getState().movesThisLevel} / ${this.optimalMoves}`);
+
+    if (result.kind === 'slide') {
+      this.history.push({
+        blockId: block.blockId,
+        prevPos: [...block.gridPos] as [number, number],
+        removed: false,
+      });
+      this.grid.clear(block);
+      block.gridPos = [result.nextCol, result.nextRow];
+      this.grid.place(block);
+      block.moveToCell(this.grid, result.nextCol, result.nextRow, true);
+      AudioManager.click();
+      this.events.emit('tutorial:moved');
+      this.checkDeadEnd();
+      return;
+    }
+
+    // exit
+    this.history.push({
+      blockId: block.blockId,
+      prevPos: [...block.gridPos] as [number, number],
+      removed: true,
+    });
     this.grid.clear(block);
     AudioManager.pop();
     burstParticles(this, block.x, block.y, COLORS[block.color]);
+    store.addScore(20);
     block.flyOff(dir, () => this.afterRemove());
-
-    const store = useGameStore.getState();
-    store.incMoves();
-    store.addScore(10);
-    this.movesText.setText(`Moves: ${useGameStore.getState().movesThisLevel}`);
     this.events.emit('tutorial:moved');
   }
 
@@ -193,31 +258,55 @@ export class GameScene extends Phaser.Scene {
   }
 
   private afterRemove(): void {
-    const remaining = this.blocks.filter((b) => !b.removed);
+    const remaining = this.blocks.filter((b) => !b.removed && b.type === 'simple');
     if (remaining.length === 0) {
       this.endLevel('WIN');
       return;
     }
-    if (!this.movement.anyExitAvailable(remaining, this.grid)) {
-      this.endLevel('STUCK');
+    this.checkDeadEnd();
+  }
+
+  private checkDeadEnd(): void {
+    if (this.deadEndShown) return;
+    const remaining = this.blocks.filter((b) => !b.removed && b.type === 'simple');
+    if (remaining.length === 0) return;
+    if (!this.movement.anyValidMove(remaining, this.grid)) {
+      this.deadEndShown = true;
+      Analytics.log('level_failed', { reason: 'dead_end', moves: useGameStore.getState().movesThisLevel });
+      this.cameras.main.flash(300, 80, 0, 0);
+      remaining.forEach((b) => b.pulseRed());
+      this.time.delayedCall(700, () => this.endLevel('STUCK'));
     }
+  }
+
+  private computeStars(): number {
+    const moves = useGameStore.getState().movesThisLevel;
+    if (moves <= this.optimalMoves) return 3;
+    if (moves <= this.optimalMoves + 2) return 2;
+    return 1;
   }
 
   private endLevel(result: 'WIN' | 'STUCK'): void {
     const store = useGameStore.getState();
+    let stars = 0;
     if (result === 'WIN') {
+      stars = this.computeStars();
       AudioManager.win();
       store.unlockNext();
-      store.addScore(100);
+      store.addScore(100 * stars);
+      store.recordStars(store.currentLevel, stars);
       SDKManager.happytime();
-      Analytics.log('level_completed', { level: store.currentLevel, moves: store.movesThisLevel });
+      Analytics.log('level_completed', {
+        level: store.currentLevel,
+        moves: store.movesThisLevel,
+        stars,
+      });
     } else {
       AudioManager.thud();
-      Analytics.log('level_failed', { level: store.currentLevel });
     }
     SDKManager.gameplayStop();
     this.time.delayedCall(500, () => {
-      fadeOutAndStart(this, SCENE_KEYS.GameOver, { result });
+      fadeOutAndStart(this, SCENE_KEYS.GameOver, { result, stars });
     });
   }
 }

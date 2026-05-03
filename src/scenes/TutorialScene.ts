@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS } from '../config/Constants';
+import { SCENE_KEYS, FONT_HEADER } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { Block } from '../entities/Block';
 import { Grid } from '../entities/Grid';
@@ -18,21 +18,9 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  {
-    text: 'Welcome! Drag a block toward an edge to remove it.',
-    showArrow: true,
-    waitFor: 'move',
-  },
-  {
-    text: 'Nice! Plan the order — wrong moves trap you.',
-    showArrow: true,
-    waitFor: 'move',
-  },
-  {
-    text: 'Tap 💡 for a hint or ⏸ to pause anytime. Have fun!',
-    showArrow: false,
-    waitFor: 'tap',
-  },
+  { text: 'Drag a block toward an edge to slide or remove it.', showArrow: true, waitFor: 'move' },
+  { text: 'Yellow notches on edges = exit zones. Reach them to remove blocks.', showArrow: true, waitFor: 'move' },
+  { text: 'Tap ↶ to undo, 💡 for a hint, ⏸ to pause. Have fun!', showArrow: false, waitFor: 'tap' },
 ];
 
 export class TutorialScene extends Phaser.Scene {
@@ -60,9 +48,8 @@ export class TutorialScene extends Phaser.Scene {
 
     const skip = this.add
       .text(this.scale.width - 14, 14, 'SKIP', {
-        fontFamily: 'Arial',
-        fontSize: '14px',
-        fontStyle: 'bold',
+        fontFamily: FONT_HEADER,
+        fontSize: '12px',
         color: '#ffcc44',
         backgroundColor: '#0008',
         padding: { x: 8, y: 4 },
@@ -82,12 +69,12 @@ export class TutorialScene extends Phaser.Scene {
 
   private makeBubble(): Phaser.GameObjects.Container {
     const w = 600;
-    const h = 60;
+    const h = 56;
     const bg = this.add.rectangle(0, 0, w, h, 0x000000, 0.85).setStrokeStyle(2, 0xffcc44, 0.9);
     this.bubbleText = this.add
       .text(0, 0, '', {
         fontFamily: 'Arial',
-        fontSize: '16px',
+        fontSize: '14px',
         color: '#ffffff',
         align: 'center',
         wordWrap: { width: w - 24 },
@@ -114,7 +101,7 @@ export class TutorialScene extends Phaser.Scene {
     }
     if (step.waitFor === 'tap') {
       this.bubble.setInteractive(
-        new Phaser.Geom.Rectangle(-300, -30, 600, 60),
+        new Phaser.Geom.Rectangle(-300, -28, 600, 56),
         Phaser.Geom.Rectangle.Contains
       );
       this.bubble.once('pointerup', () => this.finish());
@@ -125,16 +112,33 @@ export class TutorialScene extends Phaser.Scene {
     const dirs: Direction[] = ['LEFT', 'RIGHT', 'UP', 'DOWN'];
     let target: Block | null = null;
     let targetDir: Direction = 'LEFT';
+    // Prefer exit move first
     for (const b of this.blocks) {
-      if (b.removed) continue;
+      if (b.removed || b.type !== 'simple') continue;
       for (const d of dirs) {
-        if (this.movement.canExit(b, this.grid, d)) {
+        const r = this.movement.attempt(b, this.grid, d);
+        if (r.kind === 'exit') {
           target = b;
           targetDir = d;
           break;
         }
       }
       if (target) break;
+    }
+    // Fallback to slide
+    if (!target) {
+      for (const b of this.blocks) {
+        if (b.removed || b.type !== 'simple') continue;
+        for (const d of dirs) {
+          const r = this.movement.attempt(b, this.grid, d);
+          if (r.kind === 'slide') {
+            target = b;
+            targetDir = d;
+            break;
+          }
+        }
+        if (target) break;
+      }
     }
     if (!target) return;
 

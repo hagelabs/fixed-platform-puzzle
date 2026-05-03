@@ -7,6 +7,7 @@ import { confetti, fadeIn, fadeOutAndStart } from '../utils/Effects';
 
 interface GameOverData {
   result: 'WIN' | 'STUCK';
+  stars?: number;
 }
 
 export class GameOverScene extends Phaser.Scene {
@@ -20,6 +21,7 @@ export class GameOverScene extends Phaser.Scene {
     const cx = width / 2;
     const cy = height / 2;
     const win = data.result === 'WIN';
+    const stars = data.stars ?? 0;
     const store = useGameStore.getState();
 
     this.cameras.main.setBackgroundColor('#0d1117');
@@ -28,23 +30,35 @@ export class GameOverScene extends Phaser.Scene {
     this.add.rectangle(cx, cy, width, height, 0x000000, 0.55);
 
     this.add
-      .text(cx, cy - 160, win ? 'LEVEL COMPLETE!' : 'STUCK!', {
+      .text(cx, cy - 200, win ? 'LEVEL COMPLETE!' : 'STUCK!', {
         fontFamily: FONT_HEADER,
         fontSize: '38px',
         color: win ? '#55cc55' : '#ff5555',
       })
       .setOrigin(0.5);
 
+    if (win) {
+      this.drawStars(cx, cy - 130, stars);
+    } else {
+      this.add
+        .text(cx, cy - 130, 'No more moves available', {
+          fontFamily: 'Arial',
+          fontSize: '14px',
+          color: '#aaaaaa',
+        })
+        .setOrigin(0.5);
+    }
+
     this.add
-      .text(cx, cy - 110, `Level ${store.currentLevel} · Moves ${store.movesThisLevel}`, {
+      .text(cx, cy - 80, `Level ${store.currentLevel} · Moves ${store.movesThisLevel}`, {
         fontFamily: 'Arial',
-        fontSize: '18px',
+        fontSize: '16px',
         color: '#cccccc',
       })
       .setOrigin(0.5);
 
     this.add
-      .text(cx, cy - 80, `Total Score: ${store.totalScore}`, {
+      .text(cx, cy - 56, `Total Score: ${store.totalScore}`, {
         fontFamily: 'Arial',
         fontSize: '14px',
         color: '#888888',
@@ -52,22 +66,21 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     if (win && store.currentLevel < TOTAL_LEVELS) {
-      this.makeButton(cx, cy - 20, 'NEXT LEVEL', () => {
+      this.makeButton(cx, cy - 10, 'NEXT LEVEL', () => {
         useGameStore.getState().setCurrentLevel(store.currentLevel + 1);
         fadeOutAndStart(this, SCENE_KEYS.Game);
       });
     } else if (win) {
       this.add
-        .text(cx, cy - 20, '🏆 ALL LEVELS DONE 🏆', {
-          fontFamily: 'Arial',
+        .text(cx, cy - 10, '🏆 ALL LEVELS DONE 🏆', {
+          fontFamily: FONT_HEADER,
           fontSize: '20px',
-          fontStyle: 'bold',
           color: '#ffcc44',
         })
         .setOrigin(0.5);
     } else {
       let busy = false;
-      this.makeButton(cx, cy - 20, '▶ CONTINUE (AD)', async () => {
+      this.makeButton(cx, cy - 10, '▶ CONTINUE (AD)', async () => {
         if (busy) return;
         busy = true;
         try {
@@ -79,17 +92,31 @@ export class GameOverScene extends Phaser.Scene {
       });
     }
 
-    this.makeButton(cx, cy + 44, 'RETRY', () => {
+    this.makeButton(cx, cy + 54, 'RETRY', () => {
       fadeOutAndStart(this, SCENE_KEYS.Game);
     });
 
-    this.makeButton(cx, cy + 108, 'MAIN MENU', () => {
+    this.makeButton(cx, cy + 118, 'MAIN MENU', () => {
       fadeOutAndStart(this, SCENE_KEYS.Menu);
     });
   }
 
+  private drawStars(x: number, y: number, count: number): void {
+    const gap = 50;
+    for (let i = 0; i < 3; i++) {
+      const filled = i < count;
+      this.add
+        .text(x - gap + i * gap, y, '★', {
+          fontFamily: 'Arial',
+          fontSize: '40px',
+          color: filled ? '#ffcc44' : '#444444',
+        })
+        .setOrigin(0.5);
+    }
+  }
+
   private makeButton(x: number, y: number, label: string, onClick: () => void): void {
-    const bg = this.add.rectangle(x, y, 260, 50, 0x4488ff).setStrokeStyle(2, 0xffffff, 0.6);
+    const bg = this.add.rectangle(x, y, 260, 48, 0x4488ff).setStrokeStyle(2, 0xffffff, 0.6);
     this.add
       .text(x, y, label, {
         fontFamily: 'Arial',

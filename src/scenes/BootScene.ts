@@ -1,27 +1,12 @@
 import Phaser from 'phaser';
+import { SCENE_KEYS } from '../config/Constants';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
-    super({ key: 'BootScene' });
+    super({ key: SCENE_KEYS.Boot });
   }
 
   create(): void {
-    const { width, height } = this.scale;
-
-    this.add
-      .text(width / 2, height / 2, 'Fixed Platform Puzzle', {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '48px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-
-    this.add
-      .text(width / 2, height / 2 + 80, 'Phase 0 — Boot OK', {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '24px',
-        color: '#888888',
-      })
-      .setOrigin(0.5);
+    this.scene.start(SCENE_KEYS.Menu);
   }
 }

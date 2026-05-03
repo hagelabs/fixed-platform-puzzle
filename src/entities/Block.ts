@@ -34,9 +34,16 @@ export class Block extends Phaser.GameObjects.Container {
     if (this.type === 'obstacle') {
       this.rect = scene.add.rectangle(0, 0, pxW, pxH, 0x404858);
       this.rect.setStrokeStyle(2, 0x6b7280, 0.6);
-      const x1 = scene.add.line(0, 0, -pxW / 2 + 6, -pxH / 2 + 6, pxW / 2 - 6, pxH / 2 - 6, 0x6b7280);
-      const x2 = scene.add.line(0, 0, -pxW / 2 + 6, pxH / 2 - 6, pxW / 2 - 6, -pxH / 2 + 6, 0x6b7280);
-      this.add([this.rect, x1, x2]);
+      const cross = scene.add.graphics();
+      cross.lineStyle(3, 0x6b7280, 0.9);
+      const m = Math.min(pxW, pxH) / 2 - 8;
+      cross.beginPath();
+      cross.moveTo(-m, -m);
+      cross.lineTo(m, m);
+      cross.moveTo(-m, m);
+      cross.lineTo(m, -m);
+      cross.strokePath();
+      this.add([this.rect, cross]);
     } else {
       this.rect = scene.add.rectangle(0, 0, pxW, pxH, COLORS[data.color]);
       this.rect.setStrokeStyle(2, 0xffffff, 0.4);
@@ -55,23 +62,24 @@ export class Block extends Phaser.GameObjects.Container {
   }
 
   private makeExitMarker(side: ExitSide, w: number, h: number): Phaser.GameObjects.Triangle {
+    const inset = 10;
     let x = 0;
     let y = 0;
     let rot = 0;
     if (side === 'TOP') {
-      y = -h / 2 + 6;
+      y = -h / 2 + inset;
       rot = -90;
     } else if (side === 'BOTTOM') {
-      y = h / 2 - 6;
+      y = h / 2 - inset;
       rot = 90;
     } else if (side === 'LEFT') {
-      x = -w / 2 + 6;
+      x = -w / 2 + inset;
       rot = 180;
     } else {
-      x = w / 2 - 6;
+      x = w / 2 - inset;
     }
-    const t = this.scene.add.triangle(x, y, 0, -3, 0, 3, 5, 0, 0xffffff);
-    t.setAlpha(0.7);
+    const t = this.scene.add.triangle(x, y, 0, -7, 0, 7, 11, 0, 0xffffff);
+    t.setAlpha(0.85);
     t.setAngle(rot);
     return t;
   }

@@ -143,29 +143,36 @@ export class TutorialScene extends Phaser.Scene {
     if (!target) return;
 
     const arrowLen = 50;
+    const headLen = 14;
     const dx = targetDir === 'RIGHT' ? arrowLen : targetDir === 'LEFT' ? -arrowLen : 0;
     const dy = targetDir === 'DOWN' ? arrowLen : targetDir === 'UP' ? -arrowLen : 0;
 
-    const line = this.add.rectangle(target.x, target.y, Math.abs(dx) || 6, Math.abs(dy) || 6, 0xffcc44);
-    if (dx !== 0) line.setOrigin(dx > 0 ? 0 : 1, 0.5);
-    else line.setOrigin(0.5, dy > 0 ? 0 : 1);
+    const sx = target.x;
+    const sy = target.y;
+    const ex = sx + dx;
+    const ey = sy + dy;
 
-    const head = this.add.triangle(
-      target.x + dx,
-      target.y + dy,
-      0,
-      -10,
-      0,
-      10,
-      14,
-      0,
-      0xffcc44
-    );
-    if (targetDir === 'LEFT') head.setAngle(180);
-    else if (targetDir === 'UP') head.setAngle(-90);
-    else if (targetDir === 'DOWN') head.setAngle(90);
+    const g = this.add.graphics();
+    g.lineStyle(4, 0xffcc44, 1);
+    g.beginPath();
+    g.moveTo(sx, sy);
+    g.lineTo(ex, ey);
+    g.strokePath();
 
-    this.arrow = this.add.container(0, 0, [line, head]).setDepth(99);
+    g.fillStyle(0xffcc44, 1);
+    let p1x = 0, p1y = 0, p2x = 0, p2y = 0, p3x = 0, p3y = 0;
+    if (targetDir === 'RIGHT') {
+      p1x = ex; p1y = ey - 8; p2x = ex; p2y = ey + 8; p3x = ex + headLen; p3y = ey;
+    } else if (targetDir === 'LEFT') {
+      p1x = ex; p1y = ey - 8; p2x = ex; p2y = ey + 8; p3x = ex - headLen; p3y = ey;
+    } else if (targetDir === 'UP') {
+      p1x = ex - 8; p1y = ey; p2x = ex + 8; p2y = ey; p3x = ex; p3y = ey - headLen;
+    } else {
+      p1x = ex - 8; p1y = ey; p2x = ex + 8; p2y = ey; p3x = ex; p3y = ey + headLen;
+    }
+    g.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
+
+    this.arrow = this.add.container(0, 0, [g]).setDepth(99);
 
     this.tweens.add({
       targets: this.arrow,

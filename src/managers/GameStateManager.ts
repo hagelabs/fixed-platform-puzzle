@@ -8,6 +8,7 @@ interface GameState {
   totalScore: number;
   movesThisLevel: number;
   audioEnabled: boolean;
+  tutorialDone: boolean;
 
   setCurrentLevel: (n: number) => void;
   unlockNext: () => void;
@@ -15,6 +16,7 @@ interface GameState {
   incMoves: () => void;
   resetMoves: () => void;
   toggleAudio: () => void;
+  setTutorialDone: (v: boolean) => void;
   resetProgress: () => void;
 }
 
@@ -26,6 +28,7 @@ const store = createStore<GameState>()(
       totalScore: 0,
       movesThisLevel: 0,
       audioEnabled: true,
+      tutorialDone: false,
 
       setCurrentLevel: (n) => set({ currentLevel: n, movesThisLevel: 0 }),
       unlockNext: () =>
@@ -36,8 +39,9 @@ const store = createStore<GameState>()(
       incMoves: () => set((s) => ({ movesThisLevel: s.movesThisLevel + 1 })),
       resetMoves: () => set({ movesThisLevel: 0 }),
       toggleAudio: () => set((s) => ({ audioEnabled: !s.audioEnabled })),
+      setTutorialDone: (v) => set({ tutorialDone: v }),
       resetProgress: () =>
-        set({ currentLevel: 1, unlockedLevel: 1, totalScore: 0, movesThisLevel: 0 }),
+        set({ currentLevel: 1, unlockedLevel: 1, totalScore: 0, movesThisLevel: 0, tutorialDone: false }),
     }),
     {
       name: 'fpp-game-state',
@@ -47,6 +51,7 @@ const store = createStore<GameState>()(
         unlockedLevel: s.unlockedLevel,
         totalScore: s.totalScore,
         audioEnabled: s.audioEnabled,
+        tutorialDone: s.tutorialDone,
       }) as Partial<GameState>,
     }
   )

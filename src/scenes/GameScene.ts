@@ -26,11 +26,14 @@ export class GameScene extends Phaser.Scene {
     super({ key: SCENE_KEYS.Game });
   }
 
-  create(): void {
+  async create(): Promise<void> {
     fadeIn(this);
     const store = useGameStore.getState();
     store.resetMoves();
     Analytics.log('level_started', { level: store.currentLevel });
+
+    // Poki spec: commercialBreak() called BEFORE gameplayStart() at natural breaks.
+    await AdManager.preLevelInterstitial();
     SDKManager.gameplayStart();
 
     this.cameras.main.setBackgroundColor('#1a1a1a');
@@ -51,8 +54,15 @@ export class GameScene extends Phaser.Scene {
 
     this.drawHud();
 
+    if (store.currentLevel === 1 && !store.tutorialDone) {
+      this.scene.launch(SCENE_KEYS.Tutorial, { blocks: this.blocks, grid: this.grid });
+    }
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       SDKManager.gameplayStop();
+      if (this.scene.isActive(SCENE_KEYS.Tutorial)) {
+        this.scene.stop(SCENE_KEYS.Tutorial);
+      }
     });
   }
 
@@ -63,9 +73,10 @@ export class GameScene extends Phaser.Scene {
     this.add.rectangle(width / 2, HUD_HEIGHT / 2, width, HUD_HEIGHT, 0x111418);
 
     this.add
-      .text(40, HUD_HEIGHT / 2, `Level ${store.currentLevel}`, {
+      .text(16, HUD_HEIGHT / 2, `Level ${store.currentLevel}`, {
         fontFamily: 'Arial',
-        fontSize: '36px',
+        fontSize: '20px',
+        fontStyle: 'bold',
         color: '#ffffff',
       })
       .setOrigin(0, 0.5);
@@ -73,15 +84,15 @@ export class GameScene extends Phaser.Scene {
     this.movesText = this.add
       .text(width / 2, HUD_HEIGHT / 2, `Moves: 0`, {
         fontFamily: 'Arial',
-        fontSize: '32px',
+        fontSize: '18px',
         color: '#cccccc',
       })
       .setOrigin(0.5);
 
     const pauseBtn = this.add
-      .text(width - 40, HUD_HEIGHT / 2, '⏸', {
+      .text(width - 16, HUD_HEIGHT / 2, '⏸', {
         fontFamily: 'Arial',
-        fontSize: '40px',
+        fontSize: '24px',
         color: '#ffffff',
       })
       .setOrigin(1, 0.5)
@@ -93,9 +104,9 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.hintBtn = this.add
-      .text(width - 120, HUD_HEIGHT / 2, '💡', {
+      .text(width - 56, HUD_HEIGHT / 2, '💡', {
         fontFamily: 'Arial',
-        fontSize: '36px',
+        fontSize: '22px',
         color: '#ffffff',
       })
       .setOrigin(1, 0.5)
@@ -153,6 +164,7 @@ export class GameScene extends Phaser.Scene {
     store.incMoves();
     store.addScore(10);
     this.movesText.setText(`Moves: ${useGameStore.getState().movesThisLevel}`);
+    this.events.emit('tutorial:moved');
   }
 
   private shake(block: Block): void {

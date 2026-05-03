@@ -4,13 +4,14 @@ import { BootScene } from '../scenes/BootScene';
 import { MenuScene } from '../scenes/MenuScene';
 import { LevelSelectScene } from '../scenes/LevelSelectScene';
 import { GameScene } from '../scenes/GameScene';
+import { TutorialScene } from '../scenes/TutorialScene';
 import { PauseScene } from '../scenes/PauseScene';
 import { GameOverScene } from '../scenes/GameOverScene';
 
 export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'game',
-  backgroundColor: '#1a1a1a',
+  backgroundColor: '#0d1117',
   render: {
     pixelArt: false,
     antialias: true,
@@ -20,8 +21,6 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
-    min: { width: 240, height: 300 },
-    max: { width: 1920, height: 2400 },
   },
-  scene: [BootScene, MenuScene, LevelSelectScene, GameScene, PauseScene, GameOverScene],
+  scene: [BootScene, MenuScene, LevelSelectScene, GameScene, TutorialScene, PauseScene, GameOverScene],
 };

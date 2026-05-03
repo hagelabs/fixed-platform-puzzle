@@ -25,11 +25,9 @@ class AnalyticsManagerImpl {
 
     const w = window as unknown as {
       PokiSDK?: { customEvent?: (n: string, m?: object) => void };
-      CrazyGames?: { SDK?: { analytics?: { trackEvent?: (n: string, m?: object) => void } } };
     };
     try {
       w.PokiSDK?.customEvent?.(name, meta);
-      w.CrazyGames?.SDK?.analytics?.trackEvent?.(name, meta);
     } catch {
       /* noop */
     }

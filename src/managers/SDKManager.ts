@@ -1,19 +1,20 @@
 type Platform = 'poki' | 'crazygames' | 'none';
+type RewardedSize = 'small' | 'medium' | 'large';
 
 interface PokiAPI {
   init?: () => Promise<void>;
-  gameLoadingStart?: () => void;
   gameLoadingFinished?: () => void;
   gameplayStart?: () => void;
   gameplayStop?: () => void;
-  commercialBreak?: () => Promise<void>;
-  rewardedBreak?: () => Promise<boolean>;
+  commercialBreak?: (onStart?: () => void) => Promise<void>;
+  rewardedBreak?: (opts?: { size?: RewardedSize; onStart?: () => void }) => Promise<boolean>;
   customEvent?: (n: string, m?: object) => void;
 }
 
 interface CrazyAPI {
   SDK?: {
     init?: () => Promise<void>;
+    environment?: 'local' | 'staging' | 'crazygames';
     game?: {
       gameplayStart?: () => void;
       gameplayStop?: () => void;
@@ -40,10 +41,8 @@ class SDKManagerImpl {
 
   detect(): Platform {
     const host = window.location.hostname;
-    if (host.includes('poki')) return 'poki';
-    if (host.includes('crazygames')) return 'crazygames';
-    if (window.PokiSDK) return 'poki';
-    if (window.CrazyGames) return 'crazygames';
+    if (host.includes('poki') || window.PokiSDK) return 'poki';
+    if (host.includes('crazygames') || window.CrazyGames) return 'crazygames';
     return 'none';
   }
 
@@ -52,7 +51,6 @@ class SDKManagerImpl {
     try {
       if (this.platform === 'poki' && window.PokiSDK?.init) {
         await window.PokiSDK.init();
-        window.PokiSDK.gameLoadingStart?.();
       } else if (this.platform === 'crazygames' && window.CrazyGames?.SDK?.init) {
         await window.CrazyGames.SDK.init();
         window.CrazyGames.SDK.game?.loadingStart?.();
@@ -84,23 +82,29 @@ class SDKManagerImpl {
     window.CrazyGames?.SDK?.game?.happytime?.();
   }
 
-  async showInterstitial(): Promise<void> {
+  // Poki spec: call BEFORE gameplayStart() at natural breaks (level start).
+  // Wraps platform call. Stops gameplay during ad, resumes after.
+  async commercialBreak(): Promise<void> {
     try {
       if (this.platform === 'poki' && window.PokiSDK?.commercialBreak) {
+        this.gameplayStop();
         await window.PokiSDK.commercialBreak();
       } else if (this.platform === 'crazygames' && window.CrazyGames?.SDK?.ad?.requestAd) {
+        this.gameplayStop();
         await window.CrazyGames.SDK.ad.requestAd('midgame');
       }
     } catch (e) {
-      console.warn('[ad] interstitial failed', e);
+      console.warn('[ad] commercialBreak failed', e);
     }
   }
 
-  async showRewarded(): Promise<boolean> {
+  async rewarded(size: RewardedSize = 'medium'): Promise<boolean> {
     try {
       if (this.platform === 'poki' && window.PokiSDK?.rewardedBreak) {
-        return (await window.PokiSDK.rewardedBreak()) ?? true;
-      } else if (this.platform === 'crazygames' && window.CrazyGames?.SDK?.ad?.requestAd) {
+        const result = await window.PokiSDK.rewardedBreak({ size });
+        return result !== false;
+      }
+      if (this.platform === 'crazygames' && window.CrazyGames?.SDK?.ad?.requestAd) {
         await window.CrazyGames.SDK.ad.requestAd('rewarded');
         return true;
       }
@@ -108,6 +112,14 @@ class SDKManagerImpl {
     } catch (e) {
       console.warn('[ad] rewarded failed', e);
       return false;
+    }
+  }
+
+  customEvent(name: string, meta?: object): void {
+    try {
+      window.PokiSDK?.customEvent?.(name, meta);
+    } catch {
+      /* noop */
     }
   }
 

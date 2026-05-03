@@ -22,71 +22,73 @@ export class GameOverScene extends Phaser.Scene {
     const win = data.result === 'WIN';
     const store = useGameStore.getState();
 
-    this.cameras.main.setBackgroundColor('#1a1a1a');
+    this.cameras.main.setBackgroundColor('#0d1117');
     if (win) confetti(this);
 
-    this.add.rectangle(cx, cy, width, height, 0x000000, 0.5);
+    this.add.rectangle(cx, cy, width, height, 0x000000, 0.55);
 
     this.add
-      .text(cx, cy - 240, win ? 'LEVEL COMPLETE!' : 'STUCK!', {
+      .text(cx, cy - 160, win ? 'LEVEL COMPLETE!' : 'STUCK!', {
         fontFamily: 'Arial',
-        fontSize: '64px',
+        fontSize: '40px',
+        fontStyle: 'bold',
         color: win ? '#55cc55' : '#ff5555',
       })
       .setOrigin(0.5);
 
     this.add
-      .text(cx, cy - 140, `Level ${store.currentLevel} · Moves ${store.movesThisLevel}`, {
+      .text(cx, cy - 110, `Level ${store.currentLevel} · Moves ${store.movesThisLevel}`, {
         fontFamily: 'Arial',
-        fontSize: '28px',
+        fontSize: '18px',
         color: '#cccccc',
       })
       .setOrigin(0.5);
 
     this.add
-      .text(cx, cy - 90, `Total Score: ${store.totalScore}`, {
+      .text(cx, cy - 80, `Total Score: ${store.totalScore}`, {
         fontFamily: 'Arial',
-        fontSize: '24px',
+        fontSize: '14px',
         color: '#888888',
       })
       .setOrigin(0.5);
 
     if (win && store.currentLevel < TOTAL_LEVELS) {
-      this.makeButton(cx, cy + 20, 'NEXT LEVEL', async () => {
-        await AdManager.showInterstitialIfDue('level_complete');
+      this.makeButton(cx, cy - 20, 'NEXT LEVEL', () => {
         useGameStore.getState().setCurrentLevel(store.currentLevel + 1);
         fadeOutAndStart(this, SCENE_KEYS.Game);
       });
     } else if (win) {
       this.add
-        .text(cx, cy + 20, '🏆 ALL LEVELS DONE 🏆', {
+        .text(cx, cy - 20, '🏆 ALL LEVELS DONE 🏆', {
           fontFamily: 'Arial',
-          fontSize: '32px',
+          fontSize: '20px',
+          fontStyle: 'bold',
           color: '#ffcc44',
         })
         .setOrigin(0.5);
     } else {
-      this.makeButton(cx, cy + 20, '▶ CONTINUE (AD)', async () => {
+      this.makeButton(cx, cy - 20, '▶ CONTINUE (AD)', async () => {
         const ok = await AdManager.showRewarded('continue');
         if (ok) fadeOutAndStart(this, SCENE_KEYS.Game);
       });
     }
 
-    this.makeButton(cx, cy + 120, 'RETRY', () => {
+    this.makeButton(cx, cy + 44, 'RETRY', () => {
       fadeOutAndStart(this, SCENE_KEYS.Game);
     });
 
-    this.makeButton(cx, cy + 220, 'MAIN MENU', () => {
+    this.makeButton(cx, cy + 108, 'MAIN MENU', () => {
       fadeOutAndStart(this, SCENE_KEYS.Menu);
     });
   }
 
   private makeButton(x: number, y: number, label: string, onClick: () => void): void {
-    const bg = this.add.rectangle(x, y, 360, 70, 0x4488ff).setStrokeStyle(3, 0xffffff, 0.6);
+    const bg = this.add.rectangle(x, y, 260, 50, 0x4488ff).setStrokeStyle(2, 0xffffff, 0.6);
     this.add
       .text(x, y, label, {
         fontFamily: 'Arial',
-        fontSize: '28px',
+        fontSize: '18px',
+        fontStyle: 'bold',
         color: '#ffffff',
       })
       .setOrigin(0.5);

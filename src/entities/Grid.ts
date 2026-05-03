@@ -17,14 +17,14 @@ export class Grid {
 
     const screenW = scene.scale.width;
     const screenH = scene.scale.height;
-    const maxByW = (screenW - 80) / cols;
-    const maxByH = (screenH - 360) / rows;
+    const maxByW = (screenW - 60) / cols;
+    const maxByH = (screenH - 120) / rows;
     this.cellSize = Math.min(CELL_SIZE, maxByW, maxByH);
 
     const boardW = this.cellSize * cols;
     const boardH = this.cellSize * rows;
     this.originX = (screenW - boardW) / 2;
-    this.originY = (screenH - boardH) / 2;
+    this.originY = 80 + ((screenH - 80 - boardH) / 2);
 
     this.occupancy = Array.from({ length: rows }, () => Array(cols).fill(null));
     this.drawBoard(scene);
@@ -32,15 +32,15 @@ export class Grid {
 
   private drawBoard(scene: Phaser.Scene) {
     const g = scene.add.graphics();
-    g.fillStyle(0x222831, 1);
+    g.fillStyle(0x1a1f2e, 1);
     g.fillRoundedRect(
-      this.originX - 12,
-      this.originY - 12,
-      this.cellSize * this.cols + 24,
-      this.cellSize * this.rows + 24,
-      14
+      this.originX - 8,
+      this.originY - 8,
+      this.cellSize * this.cols + 16,
+      this.cellSize * this.rows + 16,
+      10
     );
-    g.lineStyle(2, 0x393e46, 1);
+    g.lineStyle(1, 0x2d3548, 1);
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         g.strokeRect(

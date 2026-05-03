@@ -16,32 +16,32 @@ export class PauseScene extends Phaser.Scene {
     this.add.rectangle(cx, cy, width, height, 0x000000, 0.65);
 
     this.add
-      .text(cx, cy - 240, 'PAUSED', {
+      .text(cx, cy - 140, 'PAUSED', {
         fontFamily: 'Arial',
-        fontSize: '64px',
+        fontSize: '40px',
+        fontStyle: 'bold',
         color: '#ffffff',
       })
       .setOrigin(0.5);
 
-    this.makeButton(cx, cy - 80, 'RESUME', () => {
+    this.makeButton(cx, cy - 60, 'RESUME', () => {
       this.scene.resume(SCENE_KEYS.Game);
       this.scene.stop();
     });
 
-    const audioLabel = () =>
-      `AUDIO: ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
-    const muteBtn = this.makeButton(cx, cy + 20, audioLabel(), () => {
+    const audioLabel = () => `AUDIO: ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
+    const muteBtn = this.makeButton(cx, cy + 4, audioLabel(), () => {
       useGameStore.getState().toggleAudio();
       muteBtn.setText(audioLabel());
     });
 
-    this.makeButton(cx, cy + 120, 'RESTART LEVEL', () => {
+    this.makeButton(cx, cy + 68, 'RESTART LEVEL', () => {
       this.scene.stop(SCENE_KEYS.Game);
       this.scene.stop();
       this.scene.start(SCENE_KEYS.Game);
     });
 
-    this.makeButton(cx, cy + 220, 'MAIN MENU', () => {
+    this.makeButton(cx, cy + 132, 'MAIN MENU', () => {
       this.scene.stop(SCENE_KEYS.Game);
       this.scene.stop();
       this.scene.start(SCENE_KEYS.Menu);
@@ -54,11 +54,12 @@ export class PauseScene extends Phaser.Scene {
     label: string,
     onClick: () => void
   ): Phaser.GameObjects.Text {
-    const bg = this.add.rectangle(x, y, 360, 70, 0x4488ff).setStrokeStyle(3, 0xffffff, 0.6);
+    const bg = this.add.rectangle(x, y, 260, 50, 0x4488ff).setStrokeStyle(2, 0xffffff, 0.6);
     const txt = this.add
       .text(x, y, label, {
         fontFamily: 'Arial',
-        fontSize: '28px',
+        fontSize: '18px',
+        fontStyle: 'bold',
         color: '#ffffff',
       })
       .setOrigin(0.5);

@@ -24,10 +24,10 @@ export class Block extends Phaser.GameObjects.Container {
     this.gridPos = [c, r];
     this.size = [w, h];
 
-    const pxW = w * grid.cellSize - 8;
-    const pxH = h * grid.cellSize - 8;
+    const pxW = w * grid.cellSize - 6;
+    const pxH = h * grid.cellSize - 6;
     this.rect = scene.add.rectangle(0, 0, pxW, pxH, COLORS[data.color]);
-    this.rect.setStrokeStyle(3, 0xffffff, 0.35);
+    this.rect.setStrokeStyle(2, 0xffffff, 0.4);
     this.add(this.rect);
 
     this.setSize(pxW, pxH);

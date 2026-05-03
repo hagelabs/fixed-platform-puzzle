@@ -14,47 +14,55 @@ export class MenuScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const cx = width / 2;
 
-    this.cameras.main.setBackgroundColor('#1a1a1a');
+    this.cameras.main.setBackgroundColor('#0d1117');
 
     this.add
-      .text(cx, height * 0.18, 'Fixed Platform Puzzle', {
+      .text(cx, 90, 'Fixed Platform Puzzle', {
         fontFamily: 'Arial, sans-serif',
-        fontSize: '64px',
+        fontSize: '44px',
+        fontStyle: 'bold',
         color: '#ffffff',
       })
       .setOrigin(0.5);
 
     this.add
-      .text(cx, height * 0.25, 'Drag blocks off the board', {
+      .text(cx, 130, 'Drag blocks off the board', {
         fontFamily: 'Arial',
-        fontSize: '28px',
-        color: '#888888',
+        fontSize: '18px',
+        color: '#9ca3af',
       })
       .setOrigin(0.5);
 
     const store = useGameStore.getState();
 
-    this.makeButton(cx, height * 0.45, 'PLAY', () => {
+    this.makeButton(cx, 240, 'PLAY', () => {
       useGameStore.getState().setCurrentLevel(store.unlockedLevel);
       fadeOutAndStart(this, SCENE_KEYS.Game);
     });
 
-    this.makeButton(cx, height * 0.55, 'LEVEL SELECT', () => {
+    this.makeButton(cx, 320, 'LEVEL SELECT', () => {
       fadeOutAndStart(this, SCENE_KEYS.LevelSelect);
     });
 
+    this.makeButton(cx, 400, store.tutorialDone ? 'REPLAY TUTORIAL' : 'HOW TO PLAY', () => {
+      useGameStore.getState().setTutorialDone(false);
+      useGameStore.getState().setCurrentLevel(1);
+      fadeOutAndStart(this, SCENE_KEYS.Game);
+    });
+
     if (store.unlockedLevel > 1) {
-      this.makeButton(cx, height * 0.65, 'RESET PROGRESS', () => {
+      this.makeButton(cx, 480, 'RESET', () => {
         useGameStore.getState().resetProgress();
         this.scene.restart();
       });
     }
 
-    const audioLabel = () => `🔊 ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
+    const audioLabel = () =>
+      `🔊 ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
     const muteTxt = this.add
-      .text(width - 30, 30, audioLabel(), {
+      .text(width - 16, 16, audioLabel(), {
         fontFamily: 'Arial',
-        fontSize: '24px',
+        fontSize: '16px',
         color: '#cccccc',
       })
       .setOrigin(1, 0)
@@ -66,22 +74,23 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.add
-      .text(cx, height - 60, `Unlocked: Level ${store.unlockedLevel} · Score ${store.totalScore}`, {
+      .text(cx, height - 24, `Unlocked: Level ${store.unlockedLevel} · Score ${store.totalScore}`, {
         fontFamily: 'Arial',
-        fontSize: '22px',
-        color: '#666666',
+        fontSize: '14px',
+        color: '#6b7280',
       })
       .setOrigin(0.5);
   }
 
   private makeButton(x: number, y: number, label: string, onClick: () => void): void {
-    const w = 360;
-    const h = 80;
-    const bg = this.add.rectangle(x, y, w, h, 0x4488ff).setStrokeStyle(3, 0xffffff, 0.6);
+    const w = 280;
+    const h = 56;
+    const bg = this.add.rectangle(x, y, w, h, 0x4488ff).setStrokeStyle(2, 0xffffff, 0.6);
     const txt = this.add
       .text(x, y, label, {
         fontFamily: 'Arial',
-        fontSize: '32px',
+        fontSize: '20px',
+        fontStyle: 'bold',
         color: '#ffffff',
       })
       .setOrigin(0.5);

@@ -1,24 +1,24 @@
 import { SDKManager } from './SDKManager';
 import { Analytics } from './AnalyticsManager';
 
-export type AdPlacement = 'level_complete' | 'continue' | 'hint';
+export type AdPlacement = 'pre_level' | 'continue' | 'hint';
 
 class AdManagerImpl {
-  private interstitialCounter = 0;
-  private interstitialEvery = 3;
+  private levelStartCounter = 0;
+  private interstitialEvery = 2;
 
-  async showInterstitialIfDue(placement: AdPlacement): Promise<void> {
-    this.interstitialCounter++;
-    if (this.interstitialCounter < this.interstitialEvery) return;
-    this.interstitialCounter = 0;
-    Analytics.log('ad_request', { placement, type: 'interstitial' });
-    await SDKManager.showInterstitial();
-    Analytics.log('ad_complete', { placement, type: 'interstitial' });
+  async preLevelInterstitial(): Promise<void> {
+    this.levelStartCounter++;
+    if (this.levelStartCounter < this.interstitialEvery) return;
+    this.levelStartCounter = 0;
+    Analytics.log('ad_request', { placement: 'pre_level', type: 'interstitial' });
+    await SDKManager.commercialBreak();
+    Analytics.log('ad_complete', { placement: 'pre_level', type: 'interstitial' });
   }
 
   async showRewarded(placement: AdPlacement): Promise<boolean> {
     Analytics.log('ad_request', { placement, type: 'rewarded' });
-    const ok = await SDKManager.showRewarded();
+    const ok = await SDKManager.rewarded('medium');
     Analytics.log(ok ? 'ad_complete' : 'ad_error', { placement, type: 'rewarded' });
     return ok;
   }

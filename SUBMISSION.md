@@ -36,28 +36,33 @@ Both well under the platform 800 KB / 20 MB targets.
 - [x] No console errors on cold load (verified webpack stats clean)
 - [x] Auto-save via Zustand `persist` middleware → `localStorage`
 - [x] Save/load tested (refresh persists `unlockedLevel`, `score`, `audioEnabled`)
+- [x] Game canvas locked at 960×600, hosted in centered website frame (`src/index.html` `.game-frame` w/ `aspect-ratio: 960/600`)
+- [x] First-run interactive tutorial (`TutorialScene` overlays Level 1 w/ guided arrow + bubbles; persisted `tutorialDone` flag)
 - [x] Responsive grid sizing (`Grid.cellSize` adapts to viewport)
 - [x] No flashing >3 Hz (only fade-in at 250ms, scene-bound)
 - [ ] **Manual:** test on real Android + iOS device
 - [ ] **Manual:** profile load time in Chrome DevTools (target <2s)
 - [ ] **Manual:** 60 FPS check on low-end device
 
-### Poki SDK
-- [x] `PokiSDK.init()` in `SDKManager.init()` (main.ts pre-Phaser)
-- [x] `PokiSDK.gameLoadingFinished()` in BootScene
-- [x] `PokiSDK.gameplayStart()` on GameScene create
-- [x] `PokiSDK.gameplayStop()` on GameScene shutdown + endLevel
-- [x] `PokiSDK.commercialBreak()` for level-complete interstitial
-- [x] `PokiSDK.rewardedBreak()` for hint + continue rewarded
-- [x] `PokiSDK.customEvent()` mirrors Analytics events
+### Poki SDK (verified against https://sdk.poki.com/html5.html)
+- [x] Script: `https://game-cdn.poki.com/scripts/v2/poki-sdk.js` (matches doc)
+- [x] `PokiSDK.init()` awaited in `SDKManager.init()` before Phaser boot (`main.ts`)
+- [x] `PokiSDK.gameLoadingFinished()` in `BootScene.create()` after Phaser ready
+- [x] `PokiSDK.gameplayStart()` on `GameScene.create()` after `commercialBreak()` resolves
+- [x] `PokiSDK.gameplayStop()` on GameScene SHUTDOWN + `endLevel`
+- [x] `PokiSDK.commercialBreak()` called BEFORE `gameplayStart()` (per doc), every 2 level starts. `gameplayStop()` invoked first to comply.
+- [x] `PokiSDK.rewardedBreak({ size: 'medium' })` w/ object opts (per doc signature) for hint + dead-end continue
+- [x] `PokiSDK.customEvent()` mirrors Analytics events (kept as best-effort, optional)
 
-### CrazyGames SDK
-- [x] `CrazyGames.SDK.init()` in `SDKManager.init()`
-- [x] `CrazyGames.SDK.game.loadingStart/Stop`
-- [x] `CrazyGames.SDK.game.gameplayStart/Stop`
-- [x] `CrazyGames.SDK.game.happytime()` on win
-- [x] `CrazyGames.SDK.ad.requestAd('midgame'|'rewarded')`
-- [x] `CrazyGames.SDK.analytics.trackEvent`
+### CrazyGames SDK v3 (verified against https://docs.crazygames.com/sdk/intro/)
+- [x] Script: `https://sdk.crazygames.com/crazygames-sdk-v3.js` (matches doc)
+- [x] `await CrazyGames.SDK.init()` — required, awaited in `SDKManager.init()`
+- [x] `CrazyGames.SDK.game.loadingStart()` on init, `loadingStop()` after Phaser ready
+- [x] `CrazyGames.SDK.game.gameplayStart/Stop()` on level enter/exit
+- [x] `CrazyGames.SDK.game.happytime()` on level win
+- [x] `CrazyGames.SDK.ad.requestAd('midgame'|'rewarded')` for interstitial + rewarded
+- [x] Removed `analytics.trackEvent` — not in v3 core spec; CrazyGames analytics are platform-side
+- [x] `environment` field is read-aware (SDK auto-stubs on non-CG domains; localhost shows demo ads)
 
 ### Content
 - [x] Original artwork (procedural rectangles, no copyrighted content)

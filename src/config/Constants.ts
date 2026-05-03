@@ -1,12 +1,12 @@
 import { Color } from '../types/Game';
 
 export const GAME_WIDTH = 960;
-export const GAME_HEIGHT = 1200;
+export const GAME_HEIGHT = 600;
 
-export const CELL_SIZE = 120;
-export const BOARD_PADDING = 24;
+export const CELL_SIZE = 80;
+export const BOARD_PADDING = 16;
 
-export const HUD_HEIGHT = 140;
+export const HUD_HEIGHT = 70;
 
 export const COLORS: Record<Color, number> = {
   red: 0xff5555,
@@ -25,6 +25,7 @@ export const SCENE_KEYS = {
   Menu: 'MenuScene',
   LevelSelect: 'LevelSelectScene',
   Game: 'GameScene',
+  Tutorial: 'TutorialScene',
   Pause: 'PauseScene',
   GameOver: 'GameOverScene',
 } as const;

@@ -13,13 +13,13 @@ function computeZoom(): number {
   const dpr = window.devicePixelRatio || 1;
   const fitScale = Math.min(
     window.innerWidth / GAME_WIDTH,
-    window.innerHeight / GAME_HEIGHT
+    window.innerHeight / GAME_HEIGHT,
   );
   // Backing buffer = GAME_WIDTH * zoom. Match physical pixels = CSS_size * dpr.
-  // CSS_size = GAME_WIDTH * fitScale, so backing target = GAME_WIDTH * fitScale * dpr.
-  // Cap at 4 to bound GPU memory; floor at dpr so tiny windows still get DPR-sharp text.
-  const target = Math.max(dpr, fitScale * dpr);
-  return Math.min(4, target);
+  // Headroom factor (1.25) absorbs sub-pixel rounding + iframe scaling.
+  // Cap at 6 to bound GPU memory (~80MB for 5760x3600 RGBA).
+  const target = Math.max(dpr * 2, fitScale * dpr * 1.25);
+  return Math.min(6, target);
 }
 
 export const gameConfig: Phaser.Types.Core.GameConfig = {

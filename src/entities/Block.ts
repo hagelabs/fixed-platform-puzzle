@@ -13,6 +13,9 @@ export class Block extends Phaser.GameObjects.Container {
   public removed = false;
 
   private rect: Phaser.GameObjects.Rectangle;
+  private hitW = 0;
+  private hitH = 0;
+  private hovered = false;
 
   constructor(scene: Phaser.Scene, data: BlockData, grid: Grid) {
     const [c, r] = data.position;
@@ -33,6 +36,8 @@ export class Block extends Phaser.GameObjects.Container {
     // Hit area extends to full cell to avoid dead gaps between blocks.
     const hitW = w * grid.cellSize;
     const hitH = h * grid.cellSize;
+    this.hitW = hitW;
+    this.hitH = hitH;
 
     if (this.type === 'obstacle') {
       this.rect = scene.add.rectangle(0, 0, pxW, pxH, 0x404858);
@@ -66,35 +71,24 @@ export class Block extends Phaser.GameObjects.Container {
         Phaser.Geom.Rectangle.Contains,
       );
       if (this.input) this.input.cursor = 'pointer';
-      this.attachHover();
     }
     scene.add.existing(this);
   }
 
-  private attachHover(): void {
-    let hoverTween: Phaser.Tweens.Tween | null = null;
-    this.on('pointerover', () => {
-      if (this.removed) return;
-      hoverTween?.stop();
-      hoverTween = this.scene.tweens.add({
-        targets: this,
-        scale: 1.06,
-        duration: 120,
-        ease: 'Quad.easeOut',
-      });
-      this.rect.setStrokeStyle(3, 0xffffff, 0.9);
-    });
-    this.on('pointerout', () => {
-      if (this.removed) return;
-      hoverTween?.stop();
-      hoverTween = this.scene.tweens.add({
-        targets: this,
-        scale: 1,
-        duration: 140,
-        ease: 'Quad.easeOut',
-      });
-      this.rect.setStrokeStyle(2, 0xffffff, 0.4);
-    });
+  public setHover(state: boolean): void {
+    if (this.removed || this.type !== 'simple') return;
+    if (this.hovered === state) return;
+    this.hovered = state;
+    this.rect.setStrokeStyle(state ? 3 : 2, 0xffffff, state ? 0.9 : 0.4);
+  }
+
+  public containsPointer(worldX: number, worldY: number): boolean {
+    if (this.removed || this.type !== 'simple') return false;
+    const localX = worldX - this.x;
+    const localY = worldY - this.y;
+    const hw = this.hitW / 2;
+    const hh = this.hitH / 2;
+    return localX >= -hw && localX <= hw && localY >= -hh && localY <= hh;
   }
 
   private makeExitMarker(side: ExitSide, w: number, h: number): Phaser.GameObjects.Graphics {
@@ -141,10 +135,12 @@ export class Block extends Phaser.GameObjects.Container {
         y: ty,
         duration: 140,
         ease: 'Cubic.easeOut',
+        onComplete: () => this.scene.events.emit('block:settled'),
       });
     } else {
       this.x = tx;
       this.y = ty;
+      this.scene.events.emit('block:settled');
     }
   }
 

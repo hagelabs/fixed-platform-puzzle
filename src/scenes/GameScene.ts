@@ -27,6 +27,7 @@ export class GameScene extends Phaser.Scene {
   private deadEndShown = false;
 
   private hintBusy = false;
+  private hovered: Block | null = null;
 
   constructor() {
     super({ key: SCENE_KEYS.Game });
@@ -46,6 +47,9 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0d1117');
     this.drawBackground();
     this.input.topOnly = true;
+    this.hovered = null;
+    this.input.on('pointermove', this.refreshHover, this);
+    this.events.on('block:settled', this.refreshHover, this);
     this.movement = new MovementSystem();
 
     const levelData = getLevel(store.currentLevel);
@@ -70,10 +74,29 @@ export class GameScene extends Phaser.Scene {
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       SDKManager.gameplayStop();
+      this.input.off('pointermove', this.refreshHover, this);
+      this.events.off('block:settled', this.refreshHover, this);
+      this.hovered = null;
       if (this.scene.isActive(SCENE_KEYS.Tutorial)) {
         this.scene.stop(SCENE_KEYS.Tutorial);
       }
     });
+  }
+
+  private refreshHover(): void {
+    const p = this.input.activePointer;
+    let next: Block | null = null;
+    for (const b of this.blocks) {
+      if (b.removed || b.type !== 'simple') continue;
+      if (b.containsPointer(p.worldX, p.worldY)) {
+        next = b;
+        break;
+      }
+    }
+    if (next === this.hovered) return;
+    this.hovered?.setHover(false);
+    this.hovered = next;
+    this.hovered?.setHover(true);
   }
 
   private drawBackground(): void {

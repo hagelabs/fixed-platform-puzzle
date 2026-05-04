@@ -90,7 +90,7 @@
       }
 
       #hg-loading.fade-out {
-        opacity: 0;
+        opacity: 100%;
         pointer-events: none;
       }
 
@@ -177,7 +177,7 @@
         }
       }
     </style>
-<% if (BUILD_TARGET !== 'itch') { %>
+    <% if (BUILD_TARGET !== 'itch') { %>
     <script>
       (function loadSDK(src) {
         var s = document.createElement("script");
@@ -193,7 +193,7 @@
           : "https://game-cdn.poki.com/scripts/v2/poki-sdk.js",
       );
     </script>
-<% } %>
+    <% } %>
   </head>
   <body>
     <div class="game-frame">
@@ -204,7 +204,7 @@
       <div class="hg-brand">
         <img
           class="hg-logo-img"
-          src="TemplateData/logo.png"
+          src="../marketing/TemplateData/logo.png"
           alt="Haven Grind"
           onerror="this.style.display = 'none'"
         />

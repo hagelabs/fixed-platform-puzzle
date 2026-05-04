@@ -1,6 +1,7 @@
 const path = require('path');
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyPlugin = require('copy-webpack-plugin');
 const CompressionPlugin = require('compression-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
@@ -29,6 +30,14 @@ module.exports = (env, argv) => {
     }),
     new webpack.DefinePlugin({
       __BUILD_TARGET__: JSON.stringify(buildTarget),
+    }),
+    new CopyPlugin({
+      patterns: [
+        {
+          from: path.resolve(__dirname, 'marketing/TemplateData/logo.png'),
+          to: path.resolve(__dirname, 'dist/logo.png'),
+        },
+      ],
     }),
   ];
 

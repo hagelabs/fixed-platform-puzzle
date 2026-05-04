@@ -30,6 +30,9 @@ export class Block extends Phaser.GameObjects.Container {
 
     const pxW = w * grid.cellSize - 6;
     const pxH = h * grid.cellSize - 6;
+    // Hit area extends to full cell to avoid dead gaps between blocks.
+    const hitW = w * grid.cellSize;
+    const hitH = h * grid.cellSize;
 
     if (this.type === 'obstacle') {
       this.rect = scene.add.rectangle(0, 0, pxW, pxH, 0x404858);
@@ -56,15 +59,42 @@ export class Block extends Phaser.GameObjects.Container {
       }
     }
 
-    this.setSize(pxW, pxH);
+    this.setSize(hitW, hitH);
     if (this.type === 'simple') {
       this.setInteractive(
-        new Phaser.Geom.Rectangle(-pxW / 2, -pxH / 2, pxW, pxH),
+        new Phaser.Geom.Rectangle(-hitW / 2, -hitH / 2, hitW, hitH),
         Phaser.Geom.Rectangle.Contains,
       );
       if (this.input) this.input.cursor = 'pointer';
+      this.attachHover();
     }
     scene.add.existing(this);
+  }
+
+  private attachHover(): void {
+    let hoverTween: Phaser.Tweens.Tween | null = null;
+    this.on('pointerover', () => {
+      if (this.removed) return;
+      hoverTween?.stop();
+      hoverTween = this.scene.tweens.add({
+        targets: this,
+        scale: 1.06,
+        duration: 120,
+        ease: 'Quad.easeOut',
+      });
+      this.rect.setStrokeStyle(3, 0xffffff, 0.9);
+    });
+    this.on('pointerout', () => {
+      if (this.removed) return;
+      hoverTween?.stop();
+      hoverTween = this.scene.tweens.add({
+        targets: this,
+        scale: 1,
+        duration: 140,
+        ease: 'Quad.easeOut',
+      });
+      this.rect.setStrokeStyle(2, 0xffffff, 0.4);
+    });
   }
 
   private makeExitMarker(side: ExitSide, w: number, h: number): Phaser.GameObjects.Graphics {

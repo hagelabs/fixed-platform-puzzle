@@ -62,9 +62,10 @@ export class GameScene extends Phaser.Scene {
     levelData.blocks.forEach((bd) => {
       const block = new Block(this, bd, this.grid);
       this.grid.place(block);
-      if (block.type === 'simple') this.input2.attach(block);
       this.blocks.push(block);
     });
+
+    this.input2.setBlocks(this.blocks);
 
     this.drawHud();
 

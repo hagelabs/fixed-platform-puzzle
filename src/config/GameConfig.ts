@@ -8,20 +8,6 @@ import { TutorialScene } from "../scenes/TutorialScene";
 import { PauseScene } from "../scenes/PauseScene";
 import { GameOverScene } from "../scenes/GameOverScene";
 
-function computeZoom(): number {
-  if (typeof window === "undefined") return 1;
-  const dpr = window.devicePixelRatio || 1;
-  const fitScale = Math.min(
-    window.innerWidth / GAME_WIDTH,
-    window.innerHeight / GAME_HEIGHT,
-  );
-  // Backing buffer = GAME_WIDTH * zoom. Match physical pixels = CSS_size * dpr.
-  // Headroom factor (1.25) absorbs sub-pixel rounding + iframe scaling.
-  // Cap at 6 to bound GPU memory (~80MB for 5760x3600 RGBA).
-  const target = Math.max(dpr * 2, fitScale * dpr * 1.25);
-  return Math.min(6, target);
-}
-
 export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: "game",
@@ -38,7 +24,6 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
-    zoom: computeZoom(),
   },
   audio: {
     noAudio: true,

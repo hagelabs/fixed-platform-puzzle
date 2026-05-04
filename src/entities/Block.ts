@@ -57,7 +57,13 @@ export class Block extends Phaser.GameObjects.Container {
     }
 
     this.setSize(pxW, pxH);
-    if (this.type === 'simple') this.setInteractive({ useHandCursor: true });
+    if (this.type === 'simple') {
+      this.setInteractive(
+        new Phaser.Geom.Rectangle(-pxW / 2, -pxH / 2, pxW, pxH),
+        Phaser.Geom.Rectangle.Contains,
+      );
+      if (this.input) this.input.cursor = 'pointer';
+    }
     scene.add.existing(this);
   }
 

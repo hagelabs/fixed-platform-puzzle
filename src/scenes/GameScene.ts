@@ -45,6 +45,7 @@ export class GameScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor('#0d1117');
     this.drawBackground();
+    this.input.topOnly = true;
     this.movement = new MovementSystem();
 
     const levelData = getLevel(store.currentLevel);

@@ -147,11 +147,17 @@ export function neoButton(
 
   const container = scene.add.container(x, y, [g, txt]);
   container.setSize(w, h);
+  
+  const shadow = TOKENS.shadowOffset;
+  // Container.displayOriginX/Y = w/2, h/2 — Phaser shifts hit-test by +displayOrigin,
+  // so the rect uses (0,0) origin (not -w/2,-h/2) to land centered on the container.
   container.setInteractive(
-    new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h),
+    new Phaser.Geom.Rectangle(0, 0, w + shadow, h + shadow),
     Phaser.Geom.Rectangle.Contains,
   );
-  if (container.input) container.input.cursor = 'pointer';
+  if (container.input) {
+    container.input.cursor = 'pointer';
+  }
 
   let pressed = false;
   let enabled = true;

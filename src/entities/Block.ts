@@ -56,11 +56,16 @@ export class Block extends Phaser.GameObjects.Container {
 
     this.setSize(hitW, hitH);
     if (this.type !== 'obstacle') {
+      const shadow = TOKENS.shadowOffset;
+      // Container.displayOriginX/Y = w/2, h/2 — Phaser shifts hit-test by +displayOrigin,
+      // so rect uses (0,0) origin to land centered on the block.
       this.setInteractive(
-        new Phaser.Geom.Rectangle(-hitW / 2, -hitH / 2, hitW, hitH),
+        new Phaser.Geom.Rectangle(0, 0, hitW + shadow, hitH + shadow),
         Phaser.Geom.Rectangle.Contains,
       );
-      if (this.input) this.input.cursor = 'pointer';
+      if (this.input) {
+        this.input.cursor = 'pointer';
+      }
     }
     scene.add.existing(this);
   }
@@ -248,9 +253,12 @@ export class Block extends Phaser.GameObjects.Container {
     if (this.type === 'dependent' && this.locked) return false;
     const localX = worldX - this.x;
     const localY = worldY - this.y;
+    
+    const shadow = TOKENS.shadowOffset;
     const hw = this.hitW / 2;
     const hh = this.hitH / 2;
-    return localX >= -hw && localX <= hw && localY >= -hh && localY <= hh;
+    
+    return localX >= -hw && localX <= hw + shadow && localY >= -hh && localY <= hh + shadow;
   }
 
   public moveToCell(grid: Grid, col: number, row: number, animate = true, distance = 1): void {

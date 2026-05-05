@@ -30,8 +30,10 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
-    zoom: dpr,
     expandParent: true,
+  },
+  input: {
+    activePointers: 1,
   },
   audio: {
     noAudio: true,

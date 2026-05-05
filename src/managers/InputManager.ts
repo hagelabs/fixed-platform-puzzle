@@ -3,18 +3,25 @@ import { Block } from '../entities/Block';
 import { Direction } from '../types/Game';
 import { DRAG_THRESHOLD } from '../config/Constants';
 
-export type DragAttempt = (block: Block, direction: Direction) => void;
+export type SwipeAttempt = (block: Block, direction: Direction) => void;
+
+const GHOST_LIMIT = 18;
 
 export class InputManager {
   private dragStart: { x: number; y: number } | null = null;
   private dragBlock: Block | null = null;
   private blocks: Block[] = [];
 
-  constructor(private scene: Phaser.Scene, private onDrag: DragAttempt) {
+  constructor(
+    private scene: Phaser.Scene,
+    private onSwipe: SwipeAttempt,
+  ) {
     scene.input.on('pointerdown', this.onPointerDown, this);
+    scene.input.on('pointermove', this.onPointerMove, this);
     scene.input.on('pointerup', this.onPointerUp, this);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       scene.input.off('pointerdown', this.onPointerDown, this);
+      scene.input.off('pointermove', this.onPointerMove, this);
       scene.input.off('pointerup', this.onPointerUp, this);
     });
   }
@@ -25,7 +32,8 @@ export class InputManager {
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
     for (const b of this.blocks) {
-      if (b.removed || b.type !== 'simple') continue;
+      if (b.removed || b.type === 'obstacle') continue;
+      if (b.type === 'dependent' && b.isLocked()) continue;
       if (b.containsPointer(pointer.worldX, pointer.worldY)) {
         this.dragStart = { x: pointer.x, y: pointer.y };
         this.dragBlock = b;
@@ -34,8 +42,30 @@ export class InputManager {
     }
   }
 
-  private onPointerUp(pointer: Phaser.Input.Pointer): void {
+  private onPointerMove(pointer: Phaser.Input.Pointer): void {
     if (!this.dragStart || !this.dragBlock) return;
+    const dx = pointer.x - this.dragStart.x;
+    const dy = pointer.y - this.dragStart.y;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+    let gx = 0;
+    let gy = 0;
+    if (adx > ady) {
+      gx = Math.max(-GHOST_LIMIT, Math.min(GHOST_LIMIT, dx));
+    } else {
+      gy = Math.max(-GHOST_LIMIT, Math.min(GHOST_LIMIT, dy));
+    }
+    this.dragBlock.setVisualOffset(gx, gy);
+  }
+
+  private onPointerUp(pointer: Phaser.Input.Pointer): void {
+    if (!this.dragStart || !this.dragBlock) {
+      this.reset();
+      return;
+    }
+    const block = this.dragBlock;
+    block.setVisualOffset(0, 0);
+
     const dx = pointer.x - this.dragStart.x;
     const dy = pointer.y - this.dragStart.y;
     const adx = Math.abs(dx);
@@ -45,9 +75,12 @@ export class InputManager {
       let dir: Direction;
       if (adx > ady) dir = dx > 0 ? 'RIGHT' : 'LEFT';
       else dir = dy > 0 ? 'DOWN' : 'UP';
-      this.onDrag(this.dragBlock, dir);
+      this.onSwipe(block, dir);
     }
+    this.reset();
+  }
 
+  private reset(): void {
     this.dragStart = null;
     this.dragBlock = null;
   }

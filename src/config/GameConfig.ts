@@ -8,10 +8,16 @@ import { TutorialScene } from "../scenes/TutorialScene";
 import { PauseScene } from "../scenes/PauseScene";
 import { GameOverScene } from "../scenes/GameOverScene";
 
+const dpr =
+  typeof window !== "undefined"
+    ? Math.min(3, Math.max(1, window.devicePixelRatio || 1))
+    : 1;
+
 export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: "game",
-  backgroundColor: "#0d1117",
+  backgroundColor: "#fbf3d5",
+  title: "Static Puzzle",
   render: {
     pixelArt: false,
     antialias: true,
@@ -24,6 +30,8 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
+    zoom: dpr,
+    expandParent: true,
   },
   audio: {
     noAudio: true,

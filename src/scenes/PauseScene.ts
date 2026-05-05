@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS, FONT_HEADER } from '../config/Constants';
+import { SCENE_KEYS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
-import { AudioManager } from '../managers/AudioManager';
 import { showConfirm } from '../utils/Confirm';
+import { TOKENS, FONT_NEO, neoButton } from '../ui/Theme';
 
 export class PauseScene extends Phaser.Scene {
   constructor() {
@@ -14,28 +14,29 @@ export class PauseScene extends Phaser.Scene {
     const cx = width / 2;
     const cy = height / 2;
 
-    this.add.rectangle(cx, cy, width, height, 0x000000, 0.65);
+    this.add.rectangle(cx, cy, width, height, TOKENS.cream, 0.92);
 
     this.add
-      .text(cx, cy - 140, 'PAUSED', {
-        fontFamily: FONT_HEADER,
-        fontSize: '38px',
-        color: '#ffcc44',
+      .text(cx, cy - 160, 'PAUSED', {
+        fontFamily: FONT_NEO,
+        fontSize: '40px',
+        color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
 
-    this.makeButton(cx, cy - 60, 'RESUME', () => {
+    neoButton(this, cx, cy - 70, 280, 60, 'RESUME', TOKENS.mint, () => {
       this.scene.resume(SCENE_KEYS.Game);
       this.scene.stop();
     });
 
-    const audioLabel = () => `AUDIO: ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
-    const muteBtn = this.makeButton(cx, cy + 4, audioLabel(), () => {
+    const audioLabel = () =>
+      `SOUND: ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
+    const muteBtn = neoButton(this, cx, cy + 6, 280, 60, audioLabel(), TOKENS.sky, () => {
       useGameStore.getState().toggleAudio();
-      muteBtn.setText(audioLabel());
+      muteBtn.setLabel(audioLabel());
     });
 
-    this.makeButton(cx, cy + 68, 'RESTART LEVEL', () => {
+    neoButton(this, cx, cy + 82, 280, 60, 'RESTART', TOKENS.yellow, () => {
       showConfirm(this, {
         title: 'RESTART LEVEL?',
         body: 'Your moves on this level will be lost.',
@@ -49,35 +50,10 @@ export class PauseScene extends Phaser.Scene {
       });
     });
 
-    this.makeButton(cx, cy + 132, 'MAIN MENU', () => {
+    neoButton(this, cx, cy + 158, 280, 60, 'MAIN MENU', TOKENS.danger, () => {
       this.scene.stop(SCENE_KEYS.Game);
       this.scene.stop();
       this.scene.start(SCENE_KEYS.Menu);
     });
-  }
-
-  private makeButton(
-    x: number,
-    y: number,
-    label: string,
-    onClick: () => void
-  ): Phaser.GameObjects.Text {
-    const bg = this.add.rectangle(x, y, 260, 50, 0x4488ff).setStrokeStyle(2, 0xffffff, 0.6);
-    const txt = this.add
-      .text(x, y, label, {
-        fontFamily: 'Arial',
-        fontSize: '18px',
-        fontStyle: 'bold',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerover', () => bg.setFillStyle(0x55a0ff));
-    bg.on('pointerout', () => bg.setFillStyle(0x4488ff));
-    bg.on('pointerup', () => {
-      AudioManager.uiTap();
-      onClick();
-    });
-    return txt;
   }
 }

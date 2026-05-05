@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS, HUD_HEIGHT, COLORS, FONT_HEADER } from '../config/Constants';
+import { SCENE_KEYS, HUD_HEIGHT, COLORS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { getLevel } from '../config/Levels';
 import { Grid } from '../entities/Grid';
@@ -11,7 +11,23 @@ import { AudioManager } from '../managers/AudioManager';
 import { Analytics } from '../managers/AnalyticsManager';
 import { SDKManager } from '../managers/SDKManager';
 import { AdManager } from '../managers/AdManager';
-import { burstParticles, fadeIn, fadeOutAndStart } from '../utils/Effects';
+import {
+  burstParticles,
+  fadeIn,
+  fadeOutAndStart,
+  screenshake,
+  dustPuff,
+  removalBloom,
+  deadEndPulse,
+} from '../utils/Effects';
+import {
+  TOKENS,
+  FONT_NEO,
+  neoButton,
+  neoPill,
+  dottedBackground,
+  NeoButtonHandle,
+} from '../ui/Theme';
 
 export class GameScene extends Phaser.Scene {
   private grid!: Grid;
@@ -19,15 +35,15 @@ export class GameScene extends Phaser.Scene {
   private input2!: InputManager;
   private movement!: MovementSystem;
   private history: MoveHistoryEntry[] = [];
-  private optimalMoves = 1;
 
   private movesText!: Phaser.GameObjects.Text;
-  private hintBtn!: Phaser.GameObjects.Text;
-  private undoBtn!: Phaser.GameObjects.Text;
+  private hintBtn!: NeoButtonHandle;
+  private undoBtn!: NeoButtonHandle;
   private deadEndShown = false;
 
   private hintBusy = false;
   private hovered: Block | null = null;
+  private busy = false;
 
   constructor() {
     super({ key: SCENE_KEYS.Game });
@@ -39,13 +55,13 @@ export class GameScene extends Phaser.Scene {
     store.resetMoves();
     this.history = [];
     this.deadEndShown = false;
+    this.busy = false;
     Analytics.log('level_started', { level: store.currentLevel });
 
     await AdManager.preLevelInterstitial();
     SDKManager.gameplayStart();
 
-    this.cameras.main.setBackgroundColor('#0d1117');
-    this.drawBackground();
+    dottedBackground(this);
     this.input.topOnly = true;
     this.hovered = null;
     this.input.on('pointermove', this.refreshHover, this);
@@ -53,11 +69,10 @@ export class GameScene extends Phaser.Scene {
     this.movement = new MovementSystem();
 
     const levelData = getLevel(store.currentLevel);
-    this.optimalMoves = levelData.optimalMoves;
     this.grid = new Grid(this, levelData.cols, levelData.rows, levelData.exits);
 
     this.blocks = [];
-    this.input2 = new InputManager(this, (block, dir) => this.handleDrag(block, dir));
+    this.input2 = new InputManager(this, (block, dir) => this.handleSwipe(block, dir));
 
     levelData.blocks.forEach((bd) => {
       const block = new Block(this, bd, this.grid);
@@ -69,18 +84,11 @@ export class GameScene extends Phaser.Scene {
 
     this.drawHud();
 
-    if (store.currentLevel === 1 && !store.tutorialDone) {
-      this.scene.launch(SCENE_KEYS.Tutorial, { blocks: this.blocks, grid: this.grid });
-    }
-
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       SDKManager.gameplayStop();
       this.input.off('pointermove', this.refreshHover, this);
       this.events.off('block:settled', this.refreshHover, this);
       this.hovered = null;
-      if (this.scene.isActive(SCENE_KEYS.Tutorial)) {
-        this.scene.stop(SCENE_KEYS.Tutorial);
-      }
     });
   }
 
@@ -88,7 +96,8 @@ export class GameScene extends Phaser.Scene {
     const p = this.input.activePointer;
     let next: Block | null = null;
     for (const b of this.blocks) {
-      if (b.removed || b.type !== 'simple') continue;
+      if (b.removed || b.type === 'obstacle') continue;
+      if (b.type === 'dependent' && b.isLocked()) continue;
       if (b.containsPointer(p.worldX, p.worldY)) {
         next = b;
         break;
@@ -100,104 +109,102 @@ export class GameScene extends Phaser.Scene {
     this.hovered?.setHover(true);
   }
 
-  private drawBackground(): void {
-    const { width, height } = this.scale;
-
-    // Diagonal hatch — subtle texture
-    const hatch = this.add.graphics();
-    hatch.lineStyle(1, 0x2d3548, 0.35);
-    const step = 28;
-    for (let i = -height; i < width + height; i += step) {
-      hatch.beginPath();
-      hatch.moveTo(i, 0);
-      hatch.lineTo(i + height, height);
-      hatch.strokePath();
-    }
-
-    // Coarse dot grid — accent depth
-    const dots = this.add.graphics();
-    dots.fillStyle(0xffcc44, 0.06);
-    const dotSpacing = 56;
-    for (let y = dotSpacing / 2; y < height; y += dotSpacing) {
-      for (let x = dotSpacing / 2; x < width; x += dotSpacing) {
-        dots.fillCircle(x, y, 2.5);
-      }
-    }
-
-    // Soft vignette via 4 edge gradients (alpha rectangles)
-    const vignette = this.add.graphics();
-    const vsteps = 12;
-    const vmax = 0.35;
-    for (let i = 0; i < vsteps; i++) {
-      const a = vmax * (1 - i / vsteps);
-      const inset = i * 4;
-      vignette.lineStyle(2, 0x000000, a);
-      vignette.strokeRect(inset, inset, width - inset * 2, height - inset * 2);
-    }
-  }
-
   private drawHud(): void {
     const { width } = this.scale;
     const store = useGameStore.getState();
 
-    this.add.rectangle(width / 2, HUD_HEIGHT / 2, width, HUD_HEIGHT, 0x111418);
-
-    this.add
-      .text(16, HUD_HEIGHT / 2, `Level ${store.currentLevel}`, {
-        fontFamily: FONT_HEADER,
-        fontSize: '20px',
-        color: '#ffcc44',
-      })
-      .setOrigin(0, 0.5);
+    const headerY = 36;
+    this.drawHudLabel(64, headerY, 96, 48, `LV ${store.currentLevel}`, TOKENS.mint);
 
     this.movesText = this.add
-      .text(width / 2, HUD_HEIGHT / 2, `Moves: 0 / ${this.optimalMoves}`, {
-        fontFamily: 'Arial',
+      .text(width / 2, headerY, `MOVES: 0`, {
+        fontFamily: FONT_NEO,
         fontSize: '18px',
-        color: '#cccccc',
+        color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
 
-    const pauseBtn = this.add
-      .text(width - 16, HUD_HEIGHT / 2, '⏸', {
-        fontFamily: 'Arial',
-        fontSize: '24px',
-        color: '#ffffff',
-      })
-      .setOrigin(1, 0.5)
-      .setInteractive({ useHandCursor: true });
-    pauseBtn.on('pointerup', () => {
-      AudioManager.uiTap();
-      this.scene.launch(SCENE_KEYS.Pause);
-      this.scene.pause();
-    });
+    neoPill(
+      this,
+      width - 64,
+      headerY,
+      'II',
+      () => {
+        AudioManager.uiTap();
+        this.scene.launch(SCENE_KEYS.Pause);
+        this.scene.pause();
+      },
+      { w: 56, h: 48, fill: TOKENS.white, textSize: 18 },
+    );
 
-    this.hintBtn = this.add
-      .text(width - 56, HUD_HEIGHT / 2, '💡', {
-        fontFamily: 'Arial',
-        fontSize: '22px',
-        color: '#ffffff',
-      })
-      .setOrigin(1, 0.5)
-      .setInteractive({ useHandCursor: true });
-    this.hintBtn.on('pointerup', () => this.requestHint());
+    const bottomY = this.scale.height - 38;
+    this.undoBtn = neoButton(
+      this,
+      width / 2 - 110,
+      bottomY,
+      96,
+      48,
+      'UNDO',
+      TOKENS.yellow,
+      () => this.undo(),
+      { textSize: 16 },
+    );
+    this.hintBtn = neoButton(
+      this,
+      width / 2,
+      bottomY,
+      96,
+      48,
+      'HINT',
+      TOKENS.sky,
+      () => this.requestHint(),
+      { textSize: 16 },
+    );
+    neoButton(
+      this,
+      width / 2 + 110,
+      bottomY,
+      96,
+      48,
+      'RESTART',
+      TOKENS.danger,
+      () => this.scene.restart(),
+      { textSize: 16 },
+    );
+  }
 
-    this.undoBtn = this.add
-      .text(width - 96, HUD_HEIGHT / 2, '↶', {
-        fontFamily: 'Arial',
-        fontSize: '24px',
-        color: '#888888',
+  private drawHudLabel(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    label: string,
+    fill: number,
+  ): void {
+    const g = this.add.graphics();
+    const cornerR = TOKENS.cornerR;
+    const shadow = TOKENS.shadowOffset;
+    const border = TOKENS.borderPx;
+    g.fillStyle(TOKENS.ink, 1);
+    g.fillRoundedRect(-w / 2 + shadow, -h / 2 + shadow, w, h, cornerR);
+    g.fillStyle(TOKENS.ink, 1);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, cornerR);
+    g.fillStyle(fill, 1);
+    g.fillRoundedRect(-w / 2 + border, -h / 2 + border, w - border * 2, h - border * 2, cornerR - 2);
+    const txt = this.add
+      .text(0, 0, label, {
+        fontFamily: FONT_NEO,
+        fontSize: '18px',
+        color: TOKENS.inkHex,
       })
-      .setOrigin(1, 0.5)
-      .setInteractive({ useHandCursor: true });
-    this.undoBtn.on('pointerup', () => this.undo());
+      .setOrigin(0.5);
+    this.add.container(x, y, [g, txt]);
   }
 
   private async requestHint(): Promise<void> {
     if (this.hintBusy) return;
     this.hintBusy = true;
-    this.hintBtn.setAlpha(0.4);
-    this.hintBtn.disableInteractive();
+    this.hintBtn.setEnabled(false);
 
     AudioManager.uiTap();
     Analytics.log('hint_used');
@@ -209,24 +216,17 @@ export class GameScene extends Phaser.Scene {
       const target = exitMove?.block ?? this.findFirstMovable();
       if (!target) return;
 
-      const ox = target.x;
-      const oy = target.y;
       this.tweens.add({
         targets: target,
         scale: 1.15,
         duration: 200,
         yoyo: true,
         repeat: 2,
-        onComplete: () => {
-          target.setScale(1);
-          target.x = ox;
-          target.y = oy;
-        },
+        onComplete: () => target.setScale(1),
       });
     } finally {
       this.hintBusy = false;
-      this.hintBtn.setAlpha(1);
-      this.hintBtn.setInteractive({ useHandCursor: true });
+      this.hintBtn.setEnabled(true);
     }
   }
 
@@ -234,36 +234,45 @@ export class GameScene extends Phaser.Scene {
     const dirs: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
     return (
       this.blocks.find(
-        (b) => !b.removed && b.type === 'simple' && dirs.some((d) => this.movement.attempt(b, this.grid, d).kind !== 'invalid')
+        (b) =>
+          !b.removed &&
+          b.type !== 'obstacle' &&
+          dirs.some((d) => {
+            const r = this.movement.slide(b, this.grid, d, this.blocks);
+            return r.kind === 'exit' || (r.kind === 'slide' && r.distance > 0);
+          }),
       ) ?? null
     );
   }
 
   private undo(): void {
-    if (this.history.length === 0) {
-      AudioManager.thud();
-      return;
-    }
-    const entry = this.history.pop()!;
-    if (entry.removed) {
-      // Cannot undo a removed block (already destroyed). Skip removed entries — find prev slide entry.
-      AudioManager.thud();
-      return;
-    }
-    const block = this.blocks.find((b) => b.blockId === entry.blockId);
-    if (!block || block.removed) return;
+    if (this.busy) return;
+    while (this.history.length > 0) {
+      const entry = this.history.pop()!;
+      if (entry.removed) {
+        AudioManager.thud();
+        continue;
+      }
+      const block = this.blocks.find((b) => b.blockId === entry.blockId);
+      if (!block || block.removed) continue;
 
-    this.grid.clear(block);
-    block.gridPos = entry.prevPos;
-    this.grid.place(block);
-    block.moveToCell(this.grid, entry.prevPos[0], entry.prevPos[1], true);
-    AudioManager.uiTap();
-    Analytics.log('hint_used', { type: 'undo' });
+      this.grid.clear(block);
+      block.gridPos = entry.prevPos;
+      this.grid.place(block);
+      block.moveToCell(this.grid, entry.prevPos[0], entry.prevPos[1], true, 1);
+      AudioManager.uiTap();
+      Analytics.log('hint_used', { type: 'undo' });
+      this.deadEndShown = false;
+      return;
+    }
+    AudioManager.thud();
   }
 
-  private handleDrag(block: Block, dir: Direction): void {
-    if (block.removed || block.type !== 'simple') return;
-    const result = this.movement.attempt(block, this.grid, dir);
+  private handleSwipe(block: Block, dir: Direction): void {
+    if (this.busy) return;
+    if (block.removed || block.type === 'obstacle') return;
+
+    const result = this.movement.slide(block, this.grid, dir, this.blocks);
 
     if (result.kind === 'invalid') {
       AudioManager.thud();
@@ -275,7 +284,7 @@ export class GameScene extends Phaser.Scene {
     Analytics.log('block_moved', { dir, color: block.color, kind: result.kind });
     const store = useGameStore.getState();
     store.incMoves();
-    this.movesText.setText(`Moves: ${useGameStore.getState().movesThisLevel} / ${this.optimalMoves}`);
+    this.movesText.setText(`MOVES: ${useGameStore.getState().movesThisLevel}`);
 
     if (result.kind === 'slide') {
       this.history.push({
@@ -284,12 +293,19 @@ export class GameScene extends Phaser.Scene {
         removed: false,
       });
       this.grid.clear(block);
-      block.gridPos = [result.nextCol, result.nextRow];
+      block.gridPos = [result.toCol, result.toRow];
       this.grid.place(block);
-      block.moveToCell(this.grid, result.nextCol, result.nextRow, true);
-      AudioManager.click();
-      this.events.emit('tutorial:moved');
-      this.checkDeadEnd();
+      this.busy = true;
+      block.moveToCell(this.grid, result.toCol, result.toRow, true, result.distance);
+      this.time.delayedCall(Math.min(360, 90 + result.distance * 38), () => {
+        block.squash(dir);
+        dustPuff(this, block.x, block.y, dir);
+        screenshake(this, 0.003, 80);
+        AudioManager.click();
+        this.busy = false;
+        this.events.emit('tutorial:moved');
+        this.checkDeadEnd();
+      });
       return;
     }
 
@@ -300,10 +316,25 @@ export class GameScene extends Phaser.Scene {
       removed: true,
     });
     this.grid.clear(block);
+    block.gridPos = [result.toCol, result.toRow];
+    this.busy = true;
     AudioManager.pop();
-    burstParticles(this, block.x, block.y, COLORS[block.color]);
-    block.flyOff(dir, () => this.afterRemove());
+    removalBloom(this, block.x, block.y, COLORS[block.color]);
+    burstParticles(this, block.x, block.y, COLORS[block.color], 10);
+    screenshake(this, 0.004, 100);
+    block.flyOff(dir, () => {
+      this.refreshDependents();
+      this.afterRemove();
+      this.busy = false;
+    });
     this.events.emit('tutorial:moved');
+  }
+
+  private refreshDependents(): void {
+    for (const b of this.blocks) {
+      if (b.removed) continue;
+      if (b.type === 'dependent') b.refreshDependency(this.blocks);
+    }
   }
 
   private shake(block: Block): void {
@@ -319,7 +350,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private afterRemove(): void {
-    const remaining = this.blocks.filter((b) => !b.removed && b.type === 'simple');
+    const remaining = this.blocks.filter((b) => !b.removed && b.type !== 'obstacle');
     if (remaining.length === 0) {
       this.endLevel('WIN');
       return;
@@ -329,44 +360,36 @@ export class GameScene extends Phaser.Scene {
 
   private checkDeadEnd(): void {
     if (this.deadEndShown) return;
-    const remaining = this.blocks.filter((b) => !b.removed && b.type === 'simple');
+    const remaining = this.blocks.filter((b) => !b.removed && b.type !== 'obstacle');
     if (remaining.length === 0) return;
-    if (!this.movement.anyValidMove(remaining, this.grid)) {
+    if (!this.movement.anyValidMove(this.blocks, this.grid)) {
       this.deadEndShown = true;
-      Analytics.log('level_failed', { reason: 'dead_end', moves: useGameStore.getState().movesThisLevel });
-      this.cameras.main.flash(300, 80, 0, 0);
+      Analytics.log('level_failed', {
+        reason: 'dead_end',
+        moves: useGameStore.getState().movesThisLevel,
+      });
+      deadEndPulse(this);
       remaining.forEach((b) => b.pulseRed());
-      this.time.delayedCall(700, () => this.endLevel('STUCK'));
+      this.time.delayedCall(900, () => this.endLevel('STUCK'));
     }
-  }
-
-  private computeStars(): number {
-    const moves = useGameStore.getState().movesThisLevel;
-    if (moves <= this.optimalMoves) return 3;
-    if (moves <= this.optimalMoves + 2) return 2;
-    return 1;
   }
 
   private endLevel(result: 'WIN' | 'STUCK'): void {
     const store = useGameStore.getState();
-    let stars = 0;
     if (result === 'WIN') {
-      stars = this.computeStars();
       AudioManager.win();
       store.unlockNext();
-      store.recordStars(store.currentLevel, stars);
       SDKManager.happytime();
       Analytics.log('level_completed', {
         level: store.currentLevel,
         moves: store.movesThisLevel,
-        stars,
       });
     } else {
       AudioManager.thud();
     }
     SDKManager.gameplayStop();
     this.time.delayedCall(500, () => {
-      fadeOutAndStart(this, SCENE_KEYS.GameOver, { result, stars });
+      fadeOutAndStart(this, SCENE_KEYS.GameOver, { result });
     });
   }
 }

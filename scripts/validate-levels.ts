@@ -1,43 +1,93 @@
 import { LEVELS } from '../src/config/Levels.ts';
-import { solve } from '../src/utils/Solver.ts';
+import { BlockData } from '../src/types/Game.ts';
 
-let solvedCount = 0;
-let totalOptimal = 0;
-let totalVisited = 0;
-let maxVisited = 0;
-let slowest = { id: 0, ms: 0 };
+let errors = 0;
 
-console.log('id  cols size  blocks  obs  exits  optimal  visited   ms');
-console.log('--- ---- ----  ------  ---  -----  -------  -------  ---');
+function err(levelId: number, msg: string): void {
+  console.error(`L${levelId}: ${msg}`);
+  errors++;
+}
+
+const VALID_TYPES = new Set(['simple', 'constrained', 'dependent', 'obstacle']);
+const VALID_DIRS = new Set(['UP', 'DOWN', 'LEFT', 'RIGHT']);
+const VALID_SIDES = new Set(['TOP', 'BOTTOM', 'LEFT', 'RIGHT']);
+
+console.log('id  size   blocks (s/c/d/o)  exits');
+console.log('--- -----  ----------------  -----');
 
 for (const level of LEVELS) {
-  const t0 = Date.now();
-  const r = solve(level, { maxVisited: 800000, maxDepth: 200 });
-  const ms = Date.now() - t0;
-  const simple = level.blocks.filter((b) => (b.type ?? 'simple') === 'simple').length;
-  const obs = level.blocks.filter((b) => b.type === 'obstacle').length;
+  const ids = new Set<string>();
+  const counts = { simple: 0, constrained: 0, dependent: 0, obstacle: 0 };
 
-  const flag = r.solvable ? '   ' : 'XXX';
+  for (const b of level.blocks as BlockData[]) {
+    if (ids.has(b.id)) err(level.id, `duplicate block id ${b.id}`);
+    ids.add(b.id);
+
+    const type = b.type ?? 'simple';
+    if (!VALID_TYPES.has(type)) err(level.id, `invalid type ${type} on ${b.id}`);
+    counts[type as keyof typeof counts]++;
+
+    const [c, r] = b.position;
+    if (c < 0 || c >= level.cols || r < 0 || r >= level.rows) {
+      err(level.id, `block ${b.id} position out of grid (${c},${r})`);
+    }
+
+    if (type === 'constrained') {
+      if (!b.direction || !VALID_DIRS.has(b.direction)) {
+        err(level.id, `constrained ${b.id} missing/invalid direction`);
+      }
+    }
+    if (type === 'dependent') {
+      if (!b.dependsOn) err(level.id, `dependent ${b.id} missing dependsOn`);
+    }
+  }
+
+  for (const b of level.blocks as BlockData[]) {
+    if (b.type === 'dependent' && b.dependsOn) {
+      if (!ids.has(b.dependsOn)) {
+        err(level.id, `dependent ${b.id} references missing block ${b.dependsOn}`);
+      } else if (b.dependsOn === b.id) {
+        err(level.id, `dependent ${b.id} cannot depend on itself`);
+      }
+    }
+  }
+
+  for (const e of level.exits) {
+    if (!VALID_SIDES.has(e.side)) err(level.id, `invalid exit side ${e.side}`);
+    const max = e.side === 'LEFT' || e.side === 'RIGHT' ? level.rows : level.cols;
+    if (e.index < 0 || e.index >= max) {
+      err(level.id, `exit ${e.side}@${e.index} out of range`);
+    }
+  }
+
+  if (level.exits.length === 0) err(level.id, 'no exits defined');
+
+  const simple = counts.simple;
+  const con = counts.constrained;
+  const dep = counts.dependent;
+  const obs = counts.obstacle;
   console.log(
-    `${flag} ${String(level.id).padStart(2)}  ${level.cols}x${level.rows}  ${String(simple).padStart(3)}    ${String(obs).padStart(2)}    ${String(level.exits.length).padStart(3)}    ${String(level.optimalMoves).padStart(3)}    ${String(r.visited).padStart(6)}  ${String(ms).padStart(4)}`
+    `${String(level.id).padStart(2)}  ${level.cols}x${level.rows}  ${String(simple).padStart(2)}/${String(con).padStart(2)}/${String(dep).padStart(2)}/${String(obs).padStart(2)}             ${String(level.exits.length).padStart(2)}`,
   );
+}
 
-  if (r.solvable) {
-    solvedCount++;
-    totalOptimal += r.optimalMoves;
-    totalVisited += r.visited;
-    if (r.visited > maxVisited) maxVisited = r.visited;
-    if (ms > slowest.ms) slowest = { id: level.id, ms };
+// duplicate detection: signature = sorted block summary + sorted exits + grid
+const sigs = new Map<string, number>();
+for (const level of LEVELS) {
+  const blockSig = [...level.blocks]
+    .map((b) => `${b.type ?? 'simple'}@${b.position[0]},${b.position[1]}|${b.direction ?? ''}|${b.dependsOn ?? ''}`)
+    .sort()
+    .join(';');
+  const exitSig = [...level.exits].map((e) => `${e.side}@${e.index}`).sort().join(';');
+  const sig = `${level.cols}x${level.rows}#${blockSig}#${exitSig}`;
+  if (sigs.has(sig)) {
+    err(level.id, `duplicate of L${sigs.get(sig)}`);
+  } else {
+    sigs.set(sig, level.id);
   }
 }
 
 console.log('---');
-console.log(`solved:  ${solvedCount}/${LEVELS.length}`);
-console.log(`avg optimal: ${(totalOptimal / Math.max(1, solvedCount)).toFixed(1)}`);
-console.log(`avg visited: ${(totalVisited / Math.max(1, solvedCount)).toFixed(0)}`);
-console.log(`max visited: ${maxVisited}`);
-console.log(`slowest level: ${slowest.id} (${slowest.ms}ms)`);
-
-if (solvedCount < LEVELS.length) {
-  process.exit(1);
-}
+console.log(`total levels: ${LEVELS.length}`);
+console.log(`errors: ${errors}`);
+if (errors > 0) process.exit(1);

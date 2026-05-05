@@ -8,7 +8,6 @@ interface GameState {
   movesThisLevel: number;
   audioEnabled: boolean;
   tutorialDone: boolean;
-  starsByLevel: Record<number, number>;
 
   setCurrentLevel: (n: number) => void;
   unlockNext: () => void;
@@ -16,20 +15,17 @@ interface GameState {
   resetMoves: () => void;
   toggleAudio: () => void;
   setTutorialDone: (v: boolean) => void;
-  recordStars: (level: number, stars: number) => void;
-  totalStars: () => number;
   resetProgress: () => void;
 }
 
 const store = createStore<GameState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       currentLevel: 1,
       unlockedLevel: 1,
       movesThisLevel: 0,
       audioEnabled: true,
       tutorialDone: false,
-      starsByLevel: {},
 
       setCurrentLevel: (n) => set({ currentLevel: n, movesThisLevel: 0 }),
       unlockNext: () =>
@@ -40,26 +36,17 @@ const store = createStore<GameState>()(
       resetMoves: () => set({ movesThisLevel: 0 }),
       toggleAudio: () => set((s) => ({ audioEnabled: !s.audioEnabled })),
       setTutorialDone: (v) => set({ tutorialDone: v }),
-      recordStars: (level, stars) =>
-        set((s) => ({
-          starsByLevel: { ...s.starsByLevel, [level]: Math.max(s.starsByLevel[level] ?? 0, stars) },
-        })),
-      totalStars: () => {
-        const map = get().starsByLevel;
-        return Object.values(map).reduce((a: number, b: number) => a + b, 0);
-      },
       resetProgress: () =>
-        set({ currentLevel: 1, unlockedLevel: 1, movesThisLevel: 0, tutorialDone: false, starsByLevel: {} }),
+        set({ currentLevel: 1, unlockedLevel: 1, movesThisLevel: 0, tutorialDone: false }),
     }),
     {
-      name: 'fpp-game-state',
+      name: 'fpp-game-state-v2',
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         currentLevel: s.currentLevel,
         unlockedLevel: s.unlockedLevel,
         audioEnabled: s.audioEnabled,
         tutorialDone: s.tutorialDone,
-        starsByLevel: s.starsByLevel,
       }) as Partial<GameState>,
     }
   )

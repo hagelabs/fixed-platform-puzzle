@@ -1,3 +1,7 @@
+// DEPRECATED: not updated for v2 mechanics (sliding momentum, constrained, dependent).
+// Levels are now hand-authored; this solver is unused at runtime. Kept for reference only.
+// eslint-disable
+// @ts-nocheck
 import { BlockData, Direction, ExitSide, ExitZone, LevelData } from '../types/Game';
 
 type Pos = [number, number] | null;

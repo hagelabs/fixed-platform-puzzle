@@ -1,221 +1,417 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS, FONT_HEADER } from '../config/Constants';
+import { SCENE_KEYS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { Block } from '../entities/Block';
 import { Grid } from '../entities/Grid';
 import { MovementSystem } from '../systems/MovementSystem';
-import { Direction } from '../types/Game';
+import { BlockData, Direction, ExitZone } from '../types/Game';
+import { InputManager } from '../managers/InputManager';
+import { AudioManager } from '../managers/AudioManager';
+import { COLORS } from '../config/Constants';
+import {
+  TOKENS,
+  FONT_NEO,
+  neoButton,
+  neoPill,
+  dottedBackground,
+} from '../ui/Theme';
+import {
+  fadeIn,
+  fadeOutAndStart,
+  dustPuff,
+  removalBloom,
+  burstParticles,
+  screenshake,
+} from '../utils/Effects';
 
-interface TutorialData {
-  blocks: Block[];
-  grid: Grid;
+interface TutorialStep {
+  cols: number;
+  rows: number;
+  blocks: BlockData[];
+  exits: ExitZone[];
+  title: string;
+  message: string;
+  highlightId: string;
+  hintDir?: Direction;
 }
 
-interface Step {
-  text: string;
-  showArrow: boolean;
-  waitFor: 'move' | 'tap';
-}
-
-const STEPS: Step[] = [
-  { text: 'Drag a block toward an edge to slide or remove it.', showArrow: true, waitFor: 'move' },
-  { text: 'Yellow notches on edges = exit zones. Reach them to remove blocks.', showArrow: true, waitFor: 'move' },
-  { text: 'Tap ↶ to undo, 💡 for a hint, ⏸ to pause. Have fun!', showArrow: false, waitFor: 'tap' },
+const STEPS: TutorialStep[] = [
+  {
+    cols: 5,
+    rows: 3,
+    blocks: [{ id: 'r', color: 'red', position: [0, 1], size: [1, 1], type: 'simple' }],
+    exits: [{ side: 'RIGHT', index: 1 }],
+    title: 'STEP 1 — SLIDE',
+    message: 'SWIPE THE RED BLOCK TOWARD THE EXIT.',
+    highlightId: 'r',
+    hintDir: 'RIGHT',
+  },
+  {
+    cols: 5,
+    rows: 3,
+    blocks: [
+      { id: 'r1', color: 'red', position: [0, 1], size: [1, 1], type: 'simple' },
+      { id: 'r2', color: 'red', position: [4, 1], size: [1, 1], type: 'simple' },
+    ],
+    exits: [{ side: 'LEFT', index: 1 }],
+    title: 'STEP 2 — ORDER',
+    message: 'BLOCKS STOP WHEN THEY HIT EACH OTHER. CLEAR THE LEFT BLOCK FIRST.',
+    highlightId: 'r1',
+    hintDir: 'LEFT',
+  },
+  {
+    cols: 5,
+    rows: 3,
+    blocks: [
+      { id: 'y', color: 'yellow', position: [2, 1], size: [1, 1], type: 'constrained', direction: 'RIGHT' },
+    ],
+    exits: [{ side: 'RIGHT', index: 1 }, { side: 'LEFT', index: 1 }],
+    title: 'STEP 3 — CONSTRAINED',
+    message: 'YELLOW BLOCKS ONLY EXIT IN THE ARROW DIRECTION. SWIPE THAT WAY.',
+    highlightId: 'y',
+    hintDir: 'RIGHT',
+  },
+  {
+    cols: 5,
+    rows: 3,
+    blocks: [
+      { id: 'r', color: 'red', position: [0, 1], size: [1, 1], type: 'simple' },
+      { id: 'b', color: 'blue', position: [4, 1], size: [1, 1], type: 'dependent', dependsOn: 'r' },
+    ],
+    exits: [{ side: 'LEFT', index: 1 }, { side: 'RIGHT', index: 1 }],
+    title: 'STEP 4 — DEPENDENCY',
+    message: 'BLUE UNLOCKS AFTER ITS PARTNER LEAVES. SLIDE RED OUT FIRST.',
+    highlightId: 'r',
+    hintDir: 'LEFT',
+  },
 ];
 
 export class TutorialScene extends Phaser.Scene {
   private stepIndex = 0;
-  private bubble!: Phaser.GameObjects.Container;
-  private bubbleText!: Phaser.GameObjects.Text;
-  private arrow: Phaser.GameObjects.Container | null = null;
+  private grid?: Grid;
   private blocks: Block[] = [];
-  private grid!: Grid;
+  private input2?: InputManager;
   private movement = new MovementSystem();
-  private gameSceneRef!: Phaser.Scene;
+
+  private bubble?: Phaser.GameObjects.Container;
+  private bubbleTitle?: Phaser.GameObjects.Text;
+  private bubbleText?: Phaser.GameObjects.Text;
+  private highlight?: Phaser.GameObjects.Graphics;
+  private ghostArrow?: Phaser.GameObjects.Container;
+  private stepIndicator?: Phaser.GameObjects.Text;
+  private busy = false;
+  private boardLayer?: Phaser.GameObjects.Container;
 
   constructor() {
     super({ key: SCENE_KEYS.Tutorial });
   }
 
-  create(data: TutorialData): void {
-    this.blocks = data.blocks;
-    this.grid = data.grid;
-    this.gameSceneRef = this.scene.get(SCENE_KEYS.Game);
+  create(): void {
+    fadeIn(this);
+    dottedBackground(this);
     this.stepIndex = 0;
 
     this.bubble = this.makeBubble();
-    this.add.existing(this.bubble);
-
-    const skip = this.add
-      .text(this.scale.width - 14, 14, 'SKIP', {
-        fontFamily: FONT_HEADER,
-        fontSize: '12px',
-        color: '#ffcc44',
-        backgroundColor: '#0008',
-        padding: { x: 8, y: 4 },
+    this.stepIndicator = this.add
+      .text(this.scale.width / 2, 36, '', {
+        fontFamily: FONT_NEO,
+        fontSize: '14px',
+        color: TOKENS.inkHex,
       })
-      .setOrigin(1, 0)
-      .setDepth(100)
-      .setInteractive({ useHandCursor: true });
-    skip.on('pointerup', () => this.finish());
+      .setOrigin(0.5)
+      .setAlpha(0.6);
 
-    this.gameSceneRef.events.on('tutorial:moved', this.onMove, this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.gameSceneRef.events.off('tutorial:moved', this.onMove, this);
+    neoPill(this, 60, 36, '<', () => this.exit(false), {
+      w: 64,
+      h: 44,
+      fill: TOKENS.white,
+      textSize: 22,
     });
 
-    this.showStep();
+    neoButton(
+      this,
+      this.scale.width - 80,
+      36,
+      120,
+      40,
+      'SKIP',
+      TOKENS.danger,
+      () => this.exit(true),
+      { textSize: 14 },
+    );
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.teardownStep();
+    });
+
+    this.loadStep();
   }
 
   private makeBubble(): Phaser.GameObjects.Container {
-    const w = 600;
-    const h = 56;
-    const bg = this.add.rectangle(0, 0, w, h, 0x000000, 0.85).setStrokeStyle(2, 0xffcc44, 0.9);
-    this.bubbleText = this.add
-      .text(0, 0, '', {
-        fontFamily: 'Arial',
-        fontSize: '14px',
-        color: '#ffffff',
-        align: 'center',
-        wordWrap: { width: w - 24 },
+    const w = 640;
+    const h = 88;
+    const g = this.add.graphics();
+    const cornerR = TOKENS.cornerR;
+    const shadow = TOKENS.shadowOffset;
+    const border = TOKENS.borderPx;
+    g.fillStyle(TOKENS.ink, 1);
+    g.fillRoundedRect(-w / 2 + shadow, -h / 2 + shadow, w, h, cornerR);
+    g.fillStyle(TOKENS.ink, 1);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, cornerR);
+    g.fillStyle(TOKENS.white, 1);
+    g.fillRoundedRect(-w / 2 + border, -h / 2 + border, w - border * 2, h - border * 2, cornerR - 2);
+
+    this.bubbleTitle = this.add
+      .text(0, -22, '', {
+        fontFamily: FONT_NEO,
+        fontSize: '16px',
+        color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
-    const c = this.add.container(this.scale.width / 2, this.scale.height - 50, [bg, this.bubbleText]);
+
+    this.bubbleText = this.add
+      .text(0, 10, '', {
+        fontFamily: FONT_NEO,
+        fontSize: '13px',
+        color: TOKENS.inkHex,
+        align: 'center',
+        wordWrap: { width: w - 36 },
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.85);
+
+    const c = this.add.container(this.scale.width / 2, this.scale.height - 90, [
+      g,
+      this.bubbleTitle,
+      this.bubbleText,
+    ]);
     c.setDepth(100);
     return c;
   }
 
-  private showStep(): void {
+  private loadStep(): void {
+    this.teardownStep();
     const step = STEPS[this.stepIndex];
-    this.bubbleText.setText(step.text);
+    this.stepIndicator?.setText(`${this.stepIndex + 1} / ${STEPS.length}`);
+
+    if (this.bubbleTitle) this.bubbleTitle.setText(step.title);
+    if (this.bubbleText) this.bubbleText.setText(step.message);
+
+    this.boardLayer = this.add.container(0, 0);
+    this.grid = new Grid(this, step.cols, step.rows, step.exits);
+
+    this.blocks = [];
+    step.blocks.forEach((bd) => {
+      const block = new Block(this, bd, this.grid!);
+      this.grid!.place(block);
+      this.blocks.push(block);
+    });
+
+    this.input2 = new InputManager(this, (block, dir) => this.handleSwipe(block, dir));
+    this.input2.setBlocks(this.blocks);
+
+    this.drawHighlight(step.highlightId);
+    if (step.hintDir) this.drawGhostArrow(step.highlightId, step.hintDir);
+
     this.tweens.add({
       targets: this.bubble,
       alpha: { from: 0, to: 1 },
-      y: { from: this.scale.height - 30, to: this.scale.height - 50 },
-      duration: 250,
+      duration: 240,
     });
-
-    this.clearArrow();
-    if (step.showArrow) {
-      this.drawArrowOnRemovable();
-    }
-    if (step.waitFor === 'tap') {
-      this.bubble.setInteractive(
-        new Phaser.Geom.Rectangle(-300, -28, 600, 56),
-        Phaser.Geom.Rectangle.Contains
-      );
-      this.bubble.once('pointerup', () => this.finish());
-    }
   }
 
-  private drawArrowOnRemovable(): void {
-    const dirs: Direction[] = ['LEFT', 'RIGHT', 'UP', 'DOWN'];
-    let target: Block | null = null;
-    let targetDir: Direction = 'LEFT';
-    // Prefer exit move first
-    for (const b of this.blocks) {
-      if (b.removed || b.type !== 'simple') continue;
-      for (const d of dirs) {
-        const r = this.movement.attempt(b, this.grid, d);
-        if (r.kind === 'exit') {
-          target = b;
-          targetDir = d;
-          break;
-        }
-      }
-      if (target) break;
-    }
-    // Fallback to slide
-    if (!target) {
-      for (const b of this.blocks) {
-        if (b.removed || b.type !== 'simple') continue;
-        for (const d of dirs) {
-          const r = this.movement.attempt(b, this.grid, d);
-          if (r.kind === 'slide') {
-            target = b;
-            targetDir = d;
-            break;
-          }
-        }
-        if (target) break;
-      }
-    }
-    if (!target) return;
+  private drawHighlight(blockId: string): void {
+    const block = this.blocks.find((b) => b.blockId === blockId);
+    if (!block) return;
+    const g = this.add.graphics();
+    g.lineStyle(4, TOKENS.exitGlow, 1);
+    g.strokeRoundedRect(-block.size[0] * (this.grid!.cellSize / 2) - 6, -block.size[1] * (this.grid!.cellSize / 2) - 6, block.size[0] * this.grid!.cellSize + 12, block.size[1] * this.grid!.cellSize + 12, 14);
+    const c = this.add.container(block.x, block.y, [g]);
+    c.setDepth(50);
+    this.tweens.add({
+      targets: c,
+      scale: { from: 1, to: 1.1 },
+      alpha: { from: 1, to: 0.4 },
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    this.highlight = g;
+    (this.highlight as unknown as { _container: Phaser.GameObjects.Container })._container = c;
+  }
 
-    const arrowLen = 50;
-    const headLen = 14;
-    const dx = targetDir === 'RIGHT' ? arrowLen : targetDir === 'LEFT' ? -arrowLen : 0;
-    const dy = targetDir === 'DOWN' ? arrowLen : targetDir === 'UP' ? -arrowLen : 0;
-
-    const sx = target.x;
-    const sy = target.y;
+  private drawGhostArrow(blockId: string, dir: Direction): void {
+    const block = this.blocks.find((b) => b.blockId === blockId);
+    if (!block) return;
+    const len = 60;
+    const dx = dir === 'RIGHT' ? len : dir === 'LEFT' ? -len : 0;
+    const dy = dir === 'DOWN' ? len : dir === 'UP' ? -len : 0;
+    const sx = block.x;
+    const sy = block.y;
     const ex = sx + dx;
     const ey = sy + dy;
 
     const g = this.add.graphics();
-    g.lineStyle(4, 0xffcc44, 1);
+    g.lineStyle(6, TOKENS.ink, 1);
     g.beginPath();
     g.moveTo(sx, sy);
     g.lineTo(ex, ey);
     g.strokePath();
 
-    g.fillStyle(0xffcc44, 1);
+    g.fillStyle(TOKENS.yellow, 1);
+    g.lineStyle(3, TOKENS.ink, 1);
+    const headLen = 16;
     let p1x = 0, p1y = 0, p2x = 0, p2y = 0, p3x = 0, p3y = 0;
-    if (targetDir === 'RIGHT') {
-      p1x = ex; p1y = ey - 8; p2x = ex; p2y = ey + 8; p3x = ex + headLen; p3y = ey;
-    } else if (targetDir === 'LEFT') {
-      p1x = ex; p1y = ey - 8; p2x = ex; p2y = ey + 8; p3x = ex - headLen; p3y = ey;
-    } else if (targetDir === 'UP') {
-      p1x = ex - 8; p1y = ey; p2x = ex + 8; p2y = ey; p3x = ex; p3y = ey - headLen;
+    if (dir === 'RIGHT') {
+      p1x = ex; p1y = ey - 10; p2x = ex; p2y = ey + 10; p3x = ex + headLen; p3y = ey;
+    } else if (dir === 'LEFT') {
+      p1x = ex; p1y = ey - 10; p2x = ex; p2y = ey + 10; p3x = ex - headLen; p3y = ey;
+    } else if (dir === 'UP') {
+      p1x = ex - 10; p1y = ey; p2x = ex + 10; p2y = ey; p3x = ex; p3y = ey - headLen;
     } else {
-      p1x = ex - 8; p1y = ey; p2x = ex + 8; p2y = ey; p3x = ex; p3y = ey + headLen;
+      p1x = ex - 10; p1y = ey; p2x = ex + 10; p2y = ey; p3x = ex; p3y = ey + headLen;
     }
     g.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
+    g.beginPath();
+    g.moveTo(p1x, p1y);
+    g.lineTo(p3x, p3y);
+    g.lineTo(p2x, p2y);
+    g.strokePath();
 
-    this.arrow = this.add.container(0, 0, [g]).setDepth(99);
-
+    const c = this.add.container(0, 0, [g]);
+    c.setDepth(60);
     this.tweens.add({
-      targets: this.arrow,
-      alpha: { from: 0.4, to: 1 },
-      duration: 500,
+      targets: c,
+      alpha: { from: 0.3, to: 1 },
+      duration: 600,
       yoyo: true,
       repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    this.ghostArrow = c;
+  }
+
+  private handleSwipe(block: Block, dir: Direction): void {
+    if (this.busy || !this.grid) return;
+    const result = this.movement.slide(block, this.grid, dir, this.blocks);
+
+    if (result.kind === 'invalid') {
+      AudioManager.thud();
+      this.shake(block);
+      return;
+    }
+
+    if (this.ghostArrow) {
+      this.tweens.add({
+        targets: this.ghostArrow,
+        alpha: 0,
+        duration: 200,
+        onComplete: () => {
+          this.ghostArrow?.destroy();
+          this.ghostArrow = undefined;
+        },
+      });
+    }
+
+    if (result.kind === 'slide') {
+      this.grid.clear(block);
+      block.gridPos = [result.toCol, result.toRow];
+      this.grid.place(block);
+      this.busy = true;
+      block.moveToCell(this.grid, result.toCol, result.toRow, true, result.distance);
+      this.time.delayedCall(Math.min(360, 90 + result.distance * 38), () => {
+        block.squash(dir);
+        dustPuff(this, block.x, block.y, dir);
+        screenshake(this, 0.003, 80);
+        AudioManager.click();
+        this.busy = false;
+      });
+      return;
+    }
+
+    // exit
+    this.grid.clear(block);
+    block.gridPos = [result.toCol, result.toRow];
+    this.busy = true;
+    AudioManager.pop();
+    removalBloom(this, block.x, block.y, COLORS[block.color]);
+    burstParticles(this, block.x, block.y, COLORS[block.color], 10);
+    screenshake(this, 0.004, 100);
+    block.flyOff(dir, () => {
+      this.refreshDependents();
+      this.busy = false;
+      this.afterRemove();
     });
   }
 
-  private clearArrow(): void {
-    if (this.arrow) {
-      this.arrow.destroy();
-      this.arrow = null;
+  private refreshDependents(): void {
+    for (const b of this.blocks) {
+      if (b.removed) continue;
+      if (b.type === 'dependent') b.refreshDependency(this.blocks);
     }
   }
 
-  private onMove(): void {
-    if (STEPS[this.stepIndex].waitFor !== 'move') return;
+  private shake(block: Block): void {
+    const ox = block.x;
+    this.tweens.add({
+      targets: block,
+      x: ox - 8,
+      duration: 50,
+      yoyo: true,
+      repeat: 3,
+      onComplete: () => (block.x = ox),
+    });
+  }
+
+  private afterRemove(): void {
+    const remaining = this.blocks.filter((b) => !b.removed && b.type !== 'obstacle');
+    if (remaining.length === 0) {
+      this.time.delayedCall(380, () => this.advance());
+    }
+  }
+
+  private advance(): void {
     this.stepIndex++;
-    this.clearArrow();
     if (this.stepIndex >= STEPS.length) {
-      this.finish();
+      useGameStore.getState().setTutorialDone(true);
+      this.exit(true);
       return;
     }
     this.tweens.add({
       targets: this.bubble,
       alpha: 0,
       duration: 200,
-      onComplete: () => this.showStep(),
+      onComplete: () => this.loadStep(),
     });
   }
 
-  private finish(): void {
-    useGameStore.getState().setTutorialDone(true);
-    this.clearArrow();
-    this.tweens.add({
-      targets: this.bubble,
-      alpha: 0,
-      duration: 200,
-      onComplete: () => {
-        this.scene.stop();
-      },
+  private exit(done: boolean): void {
+    if (done) useGameStore.getState().setTutorialDone(true);
+    fadeOutAndStart(this, SCENE_KEYS.Menu);
+  }
+
+  private teardownStep(): void {
+    this.busy = false;
+    if (this.input2) {
+      this.input2.setBlocks([]);
+    }
+    this.blocks.forEach((b) => {
+      if (!b.removed) b.destroy();
     });
+    this.blocks = [];
+    this.boardLayer?.destroy();
+    this.boardLayer = undefined;
+    if (this.highlight) {
+      const c = (this.highlight as unknown as { _container?: Phaser.GameObjects.Container })._container;
+      c?.destroy();
+      this.highlight = undefined;
+    }
+    this.ghostArrow?.destroy();
+    this.ghostArrow = undefined;
+    if (this.grid) {
+      this.grid.destroy();
+      this.grid = undefined;
+    }
   }
 }

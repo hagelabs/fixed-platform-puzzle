@@ -16,79 +16,75 @@ const DELTA: Record<Direction, [number, number]> = {
   RIGHT: [1, 0],
 };
 
-export type MoveResult =
-  | { kind: 'exit'; side: ExitSide }
-  | { kind: 'slide'; nextCol: number; nextRow: number }
-  | { kind: 'invalid'; reason: 'blocked' | 'no_exit' | 'exit_disallowed' };
+export type SlideResult =
+  | { kind: 'exit'; side: ExitSide; toCol: number; toRow: number; distance: number }
+  | { kind: 'slide'; toCol: number; toRow: number; distance: number }
+  | { kind: 'invalid'; reason: 'blocked' | 'wrong_dir' | 'locked' | 'no_exit' };
 
 export class MovementSystem {
-  public attempt(block: Block, grid: Grid, dir: Direction): MoveResult {
-    const [x, y] = block.gridPos;
-    const [w, h] = block.size;
+  public slide(block: Block, grid: Grid, dir: Direction, allBlocks: Block[]): SlideResult {
+    if (block.removed) return { kind: 'invalid', reason: 'blocked' };
+    if (block.type === 'obstacle') return { kind: 'invalid', reason: 'blocked' };
+    if (block.type === 'dependent' && !this.depsCleared(block, allBlocks)) {
+      return { kind: 'invalid', reason: 'locked' };
+    }
+    if (block.type === 'constrained' && !this.constraintsOK(block, dir)) {
+      return { kind: 'invalid', reason: 'wrong_dir' };
+    }
+
     const [dx, dy] = DELTA[dir];
-    const nx = x + dx;
-    const ny = y + dy;
+    let curCol = block.gridPos[0];
+    let curRow = block.gridPos[1];
+    const startCol = curCol;
+    const startRow = curRow;
 
-    // Check exit: block at edge, direction goes off-grid
-    const wantsToExit =
-      (dir === 'LEFT' && x === 0) ||
-      (dir === 'UP' && y === 0) ||
-      (dir === 'RIGHT' && x + w - 1 === grid.cols - 1) ||
-      (dir === 'DOWN' && y + h - 1 === grid.rows - 1);
+    while (true) {
+      const nextCol = curCol + dx;
+      const nextRow = curRow + dy;
 
-    if (wantsToExit) {
-      const side = DIR_TO_SIDE[dir];
-      if (!block.allowedExits.includes(side)) {
-        return { kind: 'invalid', reason: 'exit_disallowed' };
-      }
-      const exitIdx = side === 'LEFT' || side === 'RIGHT' ? y : x;
-      const span = side === 'LEFT' || side === 'RIGHT' ? h : w;
-      for (let s = 0; s < span; s++) {
-        if (!grid.hasExit(side, exitIdx + s)) {
-          return { kind: 'invalid', reason: 'no_exit' };
+      if (this.outOfGrid(nextCol, nextRow, grid)) {
+        const side = DIR_TO_SIDE[dir];
+        const exitIdx = side === 'LEFT' || side === 'RIGHT' ? curRow : curCol;
+        const distance = Math.abs(curCol - startCol) + Math.abs(curRow - startRow);
+        if (grid.hasExit(side, exitIdx)) {
+          return { kind: 'exit', side, toCol: curCol, toRow: curRow, distance };
         }
+        if (distance === 0) return { kind: 'invalid', reason: 'blocked' };
+        return { kind: 'slide', toCol: curCol, toRow: curRow, distance };
       }
-      return { kind: 'exit', side };
-    }
 
-    // Try slide 1 cell
-    if (this.canSlide(block, grid, dir)) {
-      return { kind: 'slide', nextCol: nx, nextRow: ny };
+      const occ = grid.getOccupant(nextCol, nextRow);
+      if (occ && occ !== block) {
+        const distance = Math.abs(curCol - startCol) + Math.abs(curRow - startRow);
+        if (distance === 0) return { kind: 'invalid', reason: 'blocked' };
+        return { kind: 'slide', toCol: curCol, toRow: curRow, distance };
+      }
+
+      curCol = nextCol;
+      curRow = nextRow;
     }
-    return { kind: 'invalid', reason: 'blocked' };
   }
 
-  private canSlide(block: Block, grid: Grid, dir: Direction): boolean {
-    const [x, y] = block.gridPos;
-    const [w, h] = block.size;
-    const [dx, dy] = DELTA[dir];
+  public constraintsOK(block: Block, dir: Direction): boolean {
+    if (block.type !== 'constrained') return true;
+    return block.direction === dir;
+  }
 
-    // Cells the block will newly occupy
-    if (dir === 'LEFT' || dir === 'RIGHT') {
-      const checkX = dir === 'LEFT' ? x - 1 : x + w;
-      if (checkX < 0 || checkX >= grid.cols) return false;
-      for (let row = y; row < y + h; row++) {
-        const occ = grid.getOccupant(checkX, row);
-        if (occ && occ !== block) return false;
-      }
-      return true;
-    }
-    const checkY = dir === 'UP' ? y - 1 : y + h;
-    if (checkY < 0 || checkY >= grid.rows) return false;
-    for (let col = x; col < x + w; col++) {
-      const occ = grid.getOccupant(col, checkY);
-      if (occ && occ !== block) return false;
-    }
-    return true;
+  public depsCleared(block: Block, allBlocks: Block[]): boolean {
+    if (block.type !== 'dependent' || !block.dependsOn) return true;
+    const dep = allBlocks.find((b) => b.blockId === block.dependsOn);
+    if (!dep) return true;
+    return dep.removed;
   }
 
   public anyValidMove(blocks: Block[], grid: Grid): boolean {
     const dirs: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
     for (const b of blocks) {
-      if (b.removed || b.type !== 'simple') continue;
+      if (b.removed || b.type === 'obstacle') continue;
       for (const d of dirs) {
-        const r = this.attempt(b, grid, d);
-        if (r.kind !== 'invalid') return true;
+        const r = this.slide(b, grid, d, blocks);
+        if (r.kind === 'exit') return true;
+        if (r.kind === 'slide' && r.distance > 0) return true;
       }
     }
     return false;
@@ -97,12 +93,16 @@ export class MovementSystem {
   public findAnyExit(blocks: Block[], grid: Grid): { block: Block; dir: Direction } | null {
     const dirs: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
     for (const b of blocks) {
-      if (b.removed || b.type !== 'simple') continue;
+      if (b.removed || b.type === 'obstacle') continue;
       for (const d of dirs) {
-        const r = this.attempt(b, grid, d);
+        const r = this.slide(b, grid, d, blocks);
         if (r.kind === 'exit') return { block: b, dir: d };
       }
     }
     return null;
+  }
+
+  private outOfGrid(col: number, row: number, grid: Grid): boolean {
+    return col < 0 || col >= grid.cols || row < 0 || row >= grid.rows;
   }
 }

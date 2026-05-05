@@ -1,125 +1,301 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS, FONT_HEADER } from '../config/Constants';
+import { SCENE_KEYS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { AudioManager } from '../managers/AudioManager';
-import { fadeIn, fadeOutAndStart } from '../utils/Effects';
+import { fadeIn, fadeOutAndStart, dustPuff } from '../utils/Effects';
 import { showConfirm } from '../utils/Confirm';
+import {
+  TOKENS,
+  FONT_NEO,
+  neoButton,
+  neoPill,
+  dottedBackground,
+  floatingDecor,
+  popIn,
+  slideUpIn,
+  idlePulse,
+} from '../ui/Theme';
+import { Direction } from '../types/Game';
+
+interface DemoBlock {
+  container: Phaser.GameObjects.Container;
+  col: number;
+  row: number;
+}
 
 export class MenuScene extends Phaser.Scene {
+  private demoBlocks: DemoBlock[] = [];
+  private demoTimer?: Phaser.Time.TimerEvent;
+
   constructor() {
     super({ key: SCENE_KEYS.Menu });
   }
 
   create(): void {
     fadeIn(this);
+    dottedBackground(this);
+    this.demoBlocks = [];
+
+    this.spawnAmbientDecor();
+
     const { width, height } = this.scale;
     const cx = width / 2;
+    const titleY = 110;
 
-    this.cameras.main.setBackgroundColor('#0d1117');
-
-    this.add
-      .text(cx, 90, 'Fixed Platform Puzzle', {
-        fontFamily: FONT_HEADER,
-        fontSize: '40px',
-        color: '#ffcc44',
+    const titleTxt = this.add
+      .text(cx, titleY, 'KINETIC PUZZLE', {
+        fontFamily: FONT_NEO,
+        fontSize: '44px',
+        color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
+    popIn(this, titleTxt, 80);
+    this.tweens.add({
+      targets: titleTxt,
+      scale: 1.04,
+      duration: 1400,
+      delay: 600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
 
-    this.add
-      .text(cx, 130, 'Drag blocks off the board', {
-        fontFamily: 'Arial',
-        fontSize: '18px',
-        color: '#9ca3af',
+    const subTxt = this.add
+      .text(cx, titleY + 42, 'SLIDE · STACK · ESCAPE', {
+        fontFamily: FONT_NEO,
+        fontSize: '14px',
+        color: TOKENS.inkHex,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setAlpha(0.55);
+    popIn(this, subTxt, 200);
 
     const store = useGameStore.getState();
 
-    this.makeButton(cx, 240, 'PLAY', () => {
+    const playBtn = neoButton(this, cx, 240, 280, 64, 'PLAY', TOKENS.mint, () => {
+      AudioManager.uiTap();
       useGameStore.getState().setCurrentLevel(store.unlockedLevel);
+      this.cleanupDemo();
       fadeOutAndStart(this, SCENE_KEYS.Game);
     });
+    slideUpIn(this, playBtn.container, 280);
 
-    this.makeButton(cx, 320, 'LEVEL SELECT', () => {
+    const lsBtn = neoButton(this, cx, 320, 280, 64, 'LEVEL SELECT', TOKENS.sky, () => {
+      AudioManager.uiTap();
+      this.cleanupDemo();
       fadeOutAndStart(this, SCENE_KEYS.LevelSelect);
     });
+    slideUpIn(this, lsBtn.container, 360);
 
-    this.makeButton(cx, 400, store.tutorialDone ? 'REPLAY TUTORIAL' : 'HOW TO PLAY', () => {
-      useGameStore.getState().setTutorialDone(false);
-      useGameStore.getState().setCurrentLevel(1);
-      fadeOutAndStart(this, SCENE_KEYS.Game);
-    });
+    const tutBtn = neoButton(
+      this,
+      cx,
+      400,
+      280,
+      64,
+      store.tutorialDone ? 'REPLAY TUTORIAL' : 'HOW TO PLAY',
+      TOKENS.yellow,
+      () => {
+        AudioManager.uiTap();
+        this.cleanupDemo();
+        fadeOutAndStart(this, SCENE_KEYS.Tutorial);
+      },
+    );
+    slideUpIn(this, tutBtn.container, 440);
 
     if (store.unlockedLevel > 1) {
-      this.makeButton(cx, 480, 'RESET', () => {
-        showConfirm(this, {
-          title: 'RESET PROGRESS?',
-          body: 'All unlocked levels and stars will be erased. This cannot be undone.',
-          yesLabel: 'RESET',
-          noLabel: 'CANCEL',
-          onYes: () => {
-            useGameStore.getState().resetProgress();
-            this.scene.restart();
-          },
-        });
-      });
+      const resetBtn = neoButton(
+        this,
+        cx,
+        480,
+        200,
+        48,
+        'RESET',
+        TOKENS.danger,
+        () => {
+          AudioManager.uiTap();
+          showConfirm(this, {
+            title: 'RESET PROGRESS?',
+            body: 'All unlocked levels will be erased. This cannot be undone.',
+            yesLabel: 'RESET',
+            noLabel: 'CANCEL',
+            onYes: () => {
+              useGameStore.getState().resetProgress();
+              this.scene.restart();
+            },
+          });
+        },
+        { textSize: 18 },
+      );
+      slideUpIn(this, resetBtn.container, 520);
     }
 
     const audioLabel = () =>
-      `🔊 ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
-    const muteTxt = this.add
-      .text(width - 16, 16, audioLabel(), {
-        fontFamily: 'Arial',
-        fontSize: '16px',
-        color: '#cccccc',
-      })
-      .setOrigin(1, 0)
-      .setInteractive({ useHandCursor: true });
-    muteTxt.on('pointerup', () => {
-      useGameStore.getState().toggleAudio();
-      muteTxt.setText(audioLabel());
-      AudioManager.uiTap();
-    });
+      `SOUND: ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
+    const audioBtn = neoPill(
+      this,
+      width - 90,
+      36,
+      audioLabel(),
+      () => {
+        useGameStore.getState().toggleAudio();
+        audioBtn.setLabel(audioLabel());
+        AudioManager.uiTap();
+      },
+      { w: 140, h: 40, fill: TOKENS.white, textSize: 14 },
+    );
+    slideUpIn(this, audioBtn.container, 100, -30);
 
     this.add
-      .text(
-        cx,
-        height - 24,
-        `Unlocked: Level ${store.unlockedLevel} · ★ ${store.totalStars()} / ${50 * 3}`,
-        {
-          fontFamily: 'Arial',
-          fontSize: '14px',
-          color: '#6b7280',
-        }
-      )
-      .setOrigin(0.5);
-  }
-
-  private makeButton(x: number, y: number, label: string, onClick: () => void): void {
-    const w = 280;
-    const h = 56;
-    const bg = this.add.rectangle(x, y, w, h, 0x4488ff).setStrokeStyle(2, 0xffffff, 0.6);
-    const txt = this.add
-      .text(x, y, label, {
-        fontFamily: 'Arial',
-        fontSize: '20px',
-        fontStyle: 'bold',
-        color: '#ffffff',
+      .text(cx, height - 24, `LEVELS UNLOCKED: ${store.unlockedLevel}`, {
+        fontFamily: FONT_NEO,
+        fontSize: '12px',
+        color: TOKENS.inkHex,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setAlpha(0.55);
 
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerover', () => bg.setFillStyle(0x55a0ff));
-    bg.on('pointerout', () => bg.setFillStyle(0x4488ff));
-    bg.on('pointerdown', () => {
-      txt.setScale(0.95);
-      bg.setScale(0.97);
-    });
-    bg.on('pointerup', () => {
-      txt.setScale(1);
-      bg.setScale(1);
-      AudioManager.uiTap();
-      onClick();
+    this.input.on('pointerdown', this.onPointerDown, this);
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.off('pointerdown', this.onPointerDown, this);
+      this.cleanupDemo();
     });
   }
+
+  private spawnAmbientDecor(): void {
+    const { width, height } = this.scale;
+
+    const corners: Array<{
+      x: number; y: number; size: number; fill: number;
+      icon?: 'chevron' | 'chain' | 'cross'; iconDir?: Direction;
+    }> = [
+      { x: 80, y: 200, size: 50, fill: TOKENS.red },
+      { x: width - 80, y: 230, size: 56, fill: TOKENS.yellow, icon: 'chevron', iconDir: 'RIGHT' },
+      { x: 60, y: 380, size: 42, fill: TOKENS.blue, icon: 'chain' },
+      { x: width - 70, y: 410, size: 48, fill: TOKENS.mint },
+      { x: 130, y: 510, size: 38, fill: TOKENS.sky },
+      { x: width - 130, y: 520, size: 44, fill: TOKENS.obstacleGray, icon: 'cross' },
+      { x: 40, y: height - 60, size: 32, fill: TOKENS.yellow, icon: 'chevron', iconDir: 'UP' },
+      { x: width - 40, y: height - 70, size: 36, fill: TOKENS.red },
+    ];
+    corners.forEach((c, i) => {
+      const decor = floatingDecor(this, c.x, c.y, c.size, c.fill, {
+        icon: c.icon,
+        iconDir: c.iconDir,
+        bobAmt: 5 + Math.random() * 5,
+        bobDur: 1700 + Math.random() * 900,
+      });
+      decor.container.setAlpha(0);
+      this.tweens.add({
+        targets: decor.container,
+        alpha: 1,
+        duration: 380,
+        delay: 60 * i,
+        ease: 'Sine.easeOut',
+      });
+    });
+
+    this.spawnDemoMiniBoard(width - 140, 110);
+  }
+
+  private spawnDemoMiniBoard(cx: number, cy: number): void {
+    const cols = 3;
+    const rows = 1;
+    const cell = 28;
+    const boardW = cols * cell;
+    const boardH = rows * cell;
+    const ox = cx - boardW / 2;
+    const oy = cy - boardH / 2;
+
+    const g = this.add.graphics();
+    g.fillStyle(TOKENS.ink, 1);
+    g.fillRoundedRect(ox - 6 + 3, oy - 6 + 3, boardW + 12, boardH + 12, 8);
+    g.fillStyle(TOKENS.ink, 1);
+    g.fillRoundedRect(ox - 6, oy - 6, boardW + 12, boardH + 12, 8);
+    g.fillStyle(TOKENS.white, 1);
+    g.fillRoundedRect(ox - 4, oy - 4, boardW + 8, boardH + 8, 6);
+
+    const portal = this.add.graphics();
+    portal.fillStyle(TOKENS.ink, 1);
+    portal.fillRoundedRect(ox + boardW + 2, oy + 4, 6, cell - 8, 2);
+    portal.fillStyle(TOKENS.exitGlow, 1);
+    portal.fillRoundedRect(ox + boardW + 4, oy + 6, 2, cell - 12, 1);
+    this.tweens.add({
+      targets: portal,
+      alpha: { from: 1, to: 0.6 },
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    const block = this.makeMiniBlock(ox + cell / 2, oy + cell / 2, cell - 6);
+    this.demoBlocks.push({ container: block, col: 0, row: 0 });
+
+    const runDemoCycle = () => {
+      block.x = ox + cell / 2;
+      block.setAlpha(1);
+      block.setScale(1);
+      this.tweens.add({
+        targets: block,
+        x: ox + boardW - cell / 2,
+        duration: 700,
+        ease: 'Cubic.easeOut',
+        onComplete: () => {
+          this.tweens.add({
+            targets: block,
+            scaleX: 1.2,
+            scaleY: 0.8,
+            duration: 80,
+            yoyo: true,
+            ease: 'Sine.easeOut',
+            onComplete: () => {
+              this.tweens.add({
+                targets: block,
+                x: block.x + 80,
+                alpha: 0,
+                scale: 0.4,
+                duration: 280,
+                ease: 'Cubic.easeIn',
+              });
+            },
+          });
+        },
+      });
+    };
+
+    runDemoCycle();
+    this.demoTimer = this.time.addEvent({
+      delay: 1800,
+      loop: true,
+      callback: runDemoCycle,
+    });
+  }
+
+  private makeMiniBlock(x: number, y: number, size: number): Phaser.GameObjects.Container {
+    const g = this.add.graphics();
+    g.fillStyle(TOKENS.ink, 1);
+    g.fillRoundedRect(-size / 2 + 2, -size / 2 + 2, size, size, 4);
+    g.fillStyle(TOKENS.ink, 1);
+    g.fillRoundedRect(-size / 2, -size / 2, size, size, 4);
+    g.fillStyle(TOKENS.red, 1);
+    g.fillRoundedRect(-size / 2 + 2, -size / 2 + 2, size - 4, size - 4, 3);
+    return this.add.container(x, y, [g]);
+  }
+
+  private onPointerDown(pointer: Phaser.Input.Pointer): void {
+    if (pointer.y < 80 || pointer.y > this.scale.height - 50) return;
+    dustPuff(this, pointer.x, pointer.y, 'UP', 4);
+  }
+
+  private cleanupDemo(): void {
+    this.demoTimer?.remove(false);
+    this.demoTimer = undefined;
+    this.demoBlocks.forEach((b) => b.container.destroy());
+    this.demoBlocks = [];
+  }
+
+  // suppress unused warning when idlePulse not invoked (kept for future use)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private _keepIdlePulse = idlePulse;
 }

@@ -40,12 +40,12 @@ export class MenuScene extends Phaser.Scene {
 
     const { width, height } = this.scale;
     const cx = width / 2;
-    const titleY = 110;
+    const titleY = 200;
 
     const titleTxt = this.add
       .text(cx, titleY, 'KINETIC PUZZLE', {
         fontFamily: FONT_NEO,
-        fontSize: '44px',
+        fontSize: '80px',
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
@@ -61,9 +61,9 @@ export class MenuScene extends Phaser.Scene {
     });
 
     const subTxt = this.add
-      .text(cx, titleY + 42, 'SLIDE · STACK · ESCAPE', {
+      .text(cx, titleY + 76, 'SLIDE · STACK · ESCAPE', {
         fontFamily: FONT_NEO,
-        fontSize: '14px',
+        fontSize: '26px',
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5)
@@ -72,7 +72,7 @@ export class MenuScene extends Phaser.Scene {
 
     const store = useGameStore.getState();
 
-    const playBtn = neoButton(this, cx, 240, 280, 64, 'PLAY', TOKENS.mint, () => {
+    const playBtn = neoButton(this, cx, 460, 500, 116, 'PLAY', TOKENS.mint, () => {
       AudioManager.uiTap();
       useGameStore.getState().setCurrentLevel(store.unlockedLevel);
       this.cleanupDemo();
@@ -80,7 +80,7 @@ export class MenuScene extends Phaser.Scene {
     });
     slideUpIn(this, playBtn.container, 280);
 
-    const lsBtn = neoButton(this, cx, 320, 280, 64, 'LEVEL SELECT', TOKENS.sky, () => {
+    const lsBtn = neoButton(this, cx, 600, 500, 116, 'LEVEL SELECT', TOKENS.sky, () => {
       AudioManager.uiTap();
       this.cleanupDemo();
       fadeOutAndStart(this, SCENE_KEYS.LevelSelect);
@@ -90,9 +90,9 @@ export class MenuScene extends Phaser.Scene {
     const tutBtn = neoButton(
       this,
       cx,
-      400,
-      280,
-      64,
+      740,
+      500,
+      116,
       store.tutorialDone ? 'REPLAY TUTORIAL' : 'HOW TO PLAY',
       TOKENS.yellow,
       () => {
@@ -107,9 +107,9 @@ export class MenuScene extends Phaser.Scene {
       const resetBtn = neoButton(
         this,
         cx,
-        480,
-        200,
-        48,
+        880,
+        360,
+        86,
         'RESET',
         TOKENS.danger,
         () => {
@@ -125,7 +125,7 @@ export class MenuScene extends Phaser.Scene {
             },
           });
         },
-        { textSize: 18 },
+        { textSize: 32 },
       );
       slideUpIn(this, resetBtn.container, 520);
     }
@@ -134,22 +134,22 @@ export class MenuScene extends Phaser.Scene {
       `SOUND: ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
     const audioBtn = neoPill(
       this,
-      width - 90,
-      36,
+      width - 150,
+      70,
       audioLabel(),
       () => {
         useGameStore.getState().toggleAudio();
         audioBtn.setLabel(audioLabel());
         AudioManager.uiTap();
       },
-      { w: 140, h: 40, fill: TOKENS.white, textSize: 14 },
+      { w: 250, h: 72, fill: TOKENS.white, textSize: 26 },
     );
     slideUpIn(this, audioBtn.container, 100, -30);
 
     this.add
-      .text(cx, height - 24, `LEVELS UNLOCKED: ${store.unlockedLevel}`, {
+      .text(cx, height - 44, `LEVELS UNLOCKED: ${store.unlockedLevel}`, {
         fontFamily: FONT_NEO,
-        fontSize: '12px',
+        fontSize: '22px',
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5)
@@ -170,14 +170,14 @@ export class MenuScene extends Phaser.Scene {
       x: number; y: number; size: number; fill: number;
       icon?: 'chevron' | 'chain' | 'cross'; iconDir?: Direction;
     }> = [
-      { x: 80, y: 200, size: 50, fill: TOKENS.red },
-      { x: width - 80, y: 230, size: 56, fill: TOKENS.yellow, icon: 'chevron', iconDir: 'RIGHT' },
-      { x: 60, y: 380, size: 42, fill: TOKENS.blue, icon: 'chain' },
-      { x: width - 70, y: 410, size: 48, fill: TOKENS.mint },
-      { x: 130, y: 510, size: 38, fill: TOKENS.sky },
-      { x: width - 130, y: 520, size: 44, fill: TOKENS.obstacleGray, icon: 'cross' },
-      { x: 40, y: height - 60, size: 32, fill: TOKENS.yellow, icon: 'chevron', iconDir: 'UP' },
-      { x: width - 40, y: height - 70, size: 36, fill: TOKENS.red },
+      { x: 144, y: 360, size: 90, fill: TOKENS.red },
+      { x: width - 144, y: 414, size: 100, fill: TOKENS.yellow, icon: 'chevron', iconDir: 'RIGHT' },
+      { x: 108, y: 684, size: 76, fill: TOKENS.blue, icon: 'chain' },
+      { x: width - 126, y: 738, size: 86, fill: TOKENS.mint },
+      { x: 234, y: 918, size: 68, fill: TOKENS.sky },
+      { x: width - 234, y: 936, size: 80, fill: TOKENS.obstacleGray, icon: 'cross' },
+      { x: 72, y: height - 108, size: 58, fill: TOKENS.yellow, icon: 'chevron', iconDir: 'UP' },
+      { x: width - 72, y: height - 126, size: 64, fill: TOKENS.red },
     ];
     corners.forEach((c, i) => {
       const decor = floatingDecor(this, c.x, c.y, c.size, c.fill, {
@@ -196,13 +196,13 @@ export class MenuScene extends Phaser.Scene {
       });
     });
 
-    this.spawnDemoMiniBoard(width - 140, 110);
+    this.spawnDemoMiniBoard(width - 250, 200);
   }
 
   private spawnDemoMiniBoard(cx: number, cy: number): void {
     const cols = 3;
     const rows = 1;
-    const cell = 28;
+    const cell = 50;
     const boardW = cols * cell;
     const boardH = rows * cell;
     const ox = cx - boardW / 2;
@@ -252,7 +252,7 @@ export class MenuScene extends Phaser.Scene {
             onComplete: () => {
               this.tweens.add({
                 targets: block,
-                x: block.x + 80,
+                x: block.x + 144,
                 alpha: 0,
                 scale: 0.4,
                 duration: 280,
@@ -284,7 +284,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
-    if (pointer.y < 80 || pointer.y > this.scale.height - 50) return;
+    if (pointer.y < 144 || pointer.y > this.scale.height - 90) return;
     dustPuff(this, pointer.x, pointer.y, 'UP', 4);
   }
 

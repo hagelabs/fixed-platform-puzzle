@@ -113,13 +113,13 @@ export class GameScene extends Phaser.Scene {
     const { width } = this.scale;
     const store = useGameStore.getState();
 
-    const headerY = 36;
-    this.drawHudLabel(64, headerY, 96, 48, `LV ${store.currentLevel}`, TOKENS.mint);
+    const headerY = 64;
+    this.drawHudLabel(116, headerY, 172, 86, `LV ${store.currentLevel}`, TOKENS.mint);
 
     this.movesText = this.add
       .text(width / 2, headerY, `MOVES: 0`, {
         fontFamily: FONT_NEO,
-        fontSize: '18px',
+        fontSize: '32px',
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
@@ -134,42 +134,42 @@ export class GameScene extends Phaser.Scene {
         this.scene.launch(SCENE_KEYS.Pause);
         this.scene.pause();
       },
-      { w: 56, h: 48, fill: TOKENS.white, textSize: 18 },
+      { w: 100, h: 86, fill: TOKENS.white, textSize: 32 },
     );
 
-    const bottomY = this.scale.height - 38;
+    const bottomY = this.scale.height - 100;
     this.undoBtn = neoButton(
       this,
-      width / 2 - 110,
+      width / 2 - 300,
       bottomY,
-      96,
-      48,
+      200,
+      86,
       'UNDO',
       TOKENS.yellow,
       () => this.undo(),
-      { textSize: 16 },
+      { textSize: 36 },
     );
     this.hintBtn = neoButton(
       this,
       width / 2,
       bottomY,
-      96,
-      48,
+      200,
+      86,
       'HINT',
       TOKENS.sky,
       () => this.requestHint(),
-      { textSize: 16 },
+      { textSize: 36 },
     );
     neoButton(
       this,
-      width / 2 + 110,
+      width / 2 + 300,
       bottomY,
-      96,
-      48,
+      200,
+      86,
       'RESTART',
       TOKENS.danger,
       () => this.scene.restart(),
-      { textSize: 16 },
+      { textSize: 36 },
     );
   }
 
@@ -190,11 +190,11 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(TOKENS.ink, 1);
     g.fillRoundedRect(-w / 2, -h / 2, w, h, cornerR);
     g.fillStyle(fill, 1);
-    g.fillRoundedRect(-w / 2 + border, -h / 2 + border, w - border * 2, h - border * 2, cornerR - 2);
+    g.fillRoundedRect(-w / 2 + border, -h / 2 + border, w - border * 2, h - border * 2, cornerR - 4);
     const txt = this.add
       .text(0, 0, label, {
         fontFamily: FONT_NEO,
-        fontSize: '18px',
+        fontSize: '32px',
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5);

@@ -12,9 +12,9 @@ export function burstParticles(
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
     const speed = 120 + Math.random() * 180;
-    const size = 6 + Math.random() * 8;
+    const size = 11 + Math.random() * 14;
     const p = scene.add.rectangle(x, y, size, size, color);
-    p.setStrokeStyle(2, TOKENS.ink, 1);
+    p.setStrokeStyle(4, TOKENS.ink, 1);
     p.setAlpha(0.95);
     scene.tweens.add({
       targets: p,
@@ -47,10 +47,10 @@ export function confetti(scene: Phaser.Scene, durationMs = 1800): void {
     scene.time.delayedCall(delay, () => {
       const x = Math.random() * width;
       const c = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
-      const w = 8 + Math.random() * 8;
-      const h = 14 + Math.random() * 10;
+      const w = 14 + Math.random() * 14;
+      const h = 25 + Math.random() * 18;
       const p = scene.add.rectangle(x, -20, w, h, c).setAngle(Math.random() * 360);
-      p.setStrokeStyle(2, TOKENS.ink, 1);
+      p.setStrokeStyle(4, TOKENS.ink, 1);
       scene.tweens.add({
         targets: p,
         y: height + 40,
@@ -104,14 +104,14 @@ export function dustPuff(
 ): void {
   const [vx, vy] = DUST_DELTA[dir];
   for (let i = 0; i < count; i++) {
-    const offset = (Math.random() - 0.5) * 24;
+    const offset = (Math.random() - 0.5) * 44;
     const ox = vy !== 0 ? offset : 0;
     const oy = vx !== 0 ? offset : 0;
-    const size = 4 + Math.random() * 4;
+    const size = 8 + Math.random() * 8;
     const p = scene.add.rectangle(x + ox, y + oy, size, size, 0xece2c0);
-    p.setStrokeStyle(1.5, TOKENS.ink, 0.7);
+    p.setStrokeStyle(3, TOKENS.ink, 0.7);
     p.setAlpha(0.95);
-    const dist = 18 + Math.random() * 22;
+    const dist = 32 + Math.random() * 40;
     scene.tweens.add({
       targets: p,
       x: p.x + vx * dist,
@@ -132,10 +132,10 @@ export function removalBloom(
   color: number,
 ): void {
   const ring = scene.add.graphics();
-  ring.lineStyle(5, TOKENS.ink, 1);
-  ring.strokeCircle(0, 0, 26);
+  ring.lineStyle(9, TOKENS.ink, 1);
+  ring.strokeCircle(0, 0, 46);
   ring.fillStyle(color, 0.55);
-  ring.fillCircle(0, 0, 24);
+  ring.fillCircle(0, 0, 43);
   ring.x = x;
   ring.y = y;
   ring.setScale(0.2);

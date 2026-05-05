@@ -28,16 +28,16 @@ export class LevelSelectScene extends Phaser.Scene {
 
     const { width, height } = this.scale;
 
-    const back = neoPill(this, 60, 56, '<', () => {
+    const back = neoPill(this, 120, 100, '<', () => {
       AudioManager.uiTap();
       fadeOutAndStart(this, SCENE_KEYS.Menu);
-    }, { w: 64, h: 56, fill: TOKENS.white, textSize: 26 });
+    }, { w: 140, h: 100, fill: TOKENS.white, textSize: 46 });
     slideUpIn(this, back.container, 60, -20);
 
     const header = this.add
-      .text(width / 2 + 20, 56, 'SELECT LEVEL', {
+      .text(width / 2 + 36, 100, 'SELECT LEVEL', {
         fontFamily: FONT_NEO,
-        fontSize: '30px',
+        fontSize: '54px',
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
@@ -55,14 +55,14 @@ export class LevelSelectScene extends Phaser.Scene {
     const store = useGameStore.getState();
     const cols = 10;
     const rows = Math.ceil(TOTAL_LEVELS / cols);
-    const tile = 56;
-    const gapX = 14;
-    const gapY = 18;
+    const tile = 100;
+    const gapX = 26;
+    const gapY = 32;
     const gridW = cols * tile + (cols - 1) * gapX;
     const gridH = rows * tile + (rows - 1) * gapY;
     const startX = (width - gridW) / 2 + tile / 2;
-    const startY = 130 + tile / 2;
-    const usableY = height - 100;
+    const startY = 234 + tile / 2;
+    const usableY = height - 180;
     const adjStartY = startY + gridH > usableY ? usableY - gridH + tile / 2 : startY;
 
     for (let i = 0; i < TOTAL_LEVELS; i++) {
@@ -90,7 +90,7 @@ export class LevelSelectScene extends Phaser.Scene {
           useGameStore.getState().setCurrentLevel(lvl);
           fadeOutAndStart(this, SCENE_KEYS.Game);
         },
-        { textSize: 22, textColor: TOKENS.inkHex },
+        { textSize: 40, textColor: TOKENS.inkHex },
       );
 
       btn.container.setScale(0);
@@ -113,7 +113,7 @@ export class LevelSelectScene extends Phaser.Scene {
         this.time.delayedCall(140 + i * 18 + 320, () => {
           idlePulse(this, btn.container, 1.08, 900);
           const halo = this.add.graphics();
-          halo.lineStyle(3, TOKENS.ink, 1);
+          halo.lineStyle(6, TOKENS.ink, 1);
           halo.strokeCircle(0, 0, tile * 0.85);
           halo.setAlpha(0);
           btn.container.add(halo);
@@ -150,10 +150,10 @@ export class LevelSelectScene extends Phaser.Scene {
       icon?: 'chevron' | 'chain' | 'cross';
       iconDir?: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
     }> = [
-      { x: 30, y: height - 30, size: 28, fill: TOKENS.red },
-      { x: width - 30, y: height - 40, size: 32, fill: TOKENS.yellow, icon: 'chevron', iconDir: 'LEFT' },
-      { x: 36, y: 110, size: 24, fill: TOKENS.blue, icon: 'chain' },
-      { x: width - 36, y: 110, size: 26, fill: TOKENS.mint },
+      { x: 54, y: height - 54, size: 50, fill: TOKENS.red },
+      { x: width - 54, y: height - 72, size: 58, fill: TOKENS.yellow, icon: 'chevron', iconDir: 'LEFT' },
+      { x: 64, y: 200, size: 44, fill: TOKENS.blue, icon: 'chain' },
+      { x: width - 64, y: 200, size: 46, fill: TOKENS.mint },
     ];
     decor.forEach((d, i) => {
       const node = floatingDecor(this, d.x, d.y, d.size, d.fill, {

@@ -113,19 +113,19 @@ export class TutorialScene extends Phaser.Scene {
 
     this.bubble = this.makeBubble();
     this.stepIndicator = this.add
-      .text(this.scale.width / 2, 36, '', {
+      .text(this.scale.width / 2, 64, '', {
         fontFamily: FONT_NEO,
-        fontSize: '14px',
+        fontSize: '26px',
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5)
       .setAlpha(0.6);
 
-    neoPill(this, 60, 36, '<', () => this.exit(false), {
+    neoPill(this, 108, 64, '<', () => this.exit(false), {
       w: 64,
       h: 44,
       fill: TOKENS.white,
-      textSize: 22,
+      textSize: 40,
     });
 
     neoButton(
@@ -137,7 +137,7 @@ export class TutorialScene extends Phaser.Scene {
       'SKIP',
       TOKENS.danger,
       () => this.exit(true),
-      { textSize: 14 },
+      { textSize: 26 },
     );
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -148,8 +148,8 @@ export class TutorialScene extends Phaser.Scene {
   }
 
   private makeBubble(): Phaser.GameObjects.Container {
-    const w = 640;
-    const h = 88;
+    const w = 1152;
+    const h = 158;
     const g = this.add.graphics();
     const cornerR = TOKENS.cornerR;
     const shadow = TOKENS.shadowOffset;
@@ -164,7 +164,7 @@ export class TutorialScene extends Phaser.Scene {
     this.bubbleTitle = this.add
       .text(0, -22, '', {
         fontFamily: FONT_NEO,
-        fontSize: '16px',
+        fontSize: '28px',
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
@@ -172,15 +172,15 @@ export class TutorialScene extends Phaser.Scene {
     this.bubbleText = this.add
       .text(0, 10, '', {
         fontFamily: FONT_NEO,
-        fontSize: '13px',
+        fontSize: '24px',
         color: TOKENS.inkHex,
         align: 'center',
-        wordWrap: { width: w - 36 },
+        wordWrap: { width: w - 64 },
       })
       .setOrigin(0.5)
       .setAlpha(0.85);
 
-    const c = this.add.container(this.scale.width / 2, this.scale.height - 90, [
+    const c = this.add.container(this.scale.width / 2, this.scale.height - 162, [
       g,
       this.bubbleTitle,
       this.bubbleText,
@@ -224,7 +224,7 @@ export class TutorialScene extends Phaser.Scene {
     const block = this.blocks.find((b) => b.blockId === blockId);
     if (!block) return;
     const g = this.add.graphics();
-    g.lineStyle(4, TOKENS.exitGlow, 1);
+    g.lineStyle(8, TOKENS.exitGlow, 1);
     g.strokeRoundedRect(-block.size[0] * (this.grid!.cellSize / 2) - 6, -block.size[1] * (this.grid!.cellSize / 2) - 6, block.size[0] * this.grid!.cellSize + 12, block.size[1] * this.grid!.cellSize + 12, 14);
     const c = this.add.container(block.x, block.y, [g]);
     c.setDepth(50);
@@ -244,7 +244,7 @@ export class TutorialScene extends Phaser.Scene {
   private drawGhostArrow(blockId: string, dir: Direction): void {
     const block = this.blocks.find((b) => b.blockId === blockId);
     if (!block) return;
-    const len = 60;
+    const len = 108;
     const dx = dir === 'RIGHT' ? len : dir === 'LEFT' ? -len : 0;
     const dy = dir === 'DOWN' ? len : dir === 'UP' ? -len : 0;
     const sx = block.x;
@@ -253,24 +253,24 @@ export class TutorialScene extends Phaser.Scene {
     const ey = sy + dy;
 
     const g = this.add.graphics();
-    g.lineStyle(6, TOKENS.ink, 1);
+    g.lineStyle(10, TOKENS.ink, 1);
     g.beginPath();
     g.moveTo(sx, sy);
     g.lineTo(ex, ey);
     g.strokePath();
 
     g.fillStyle(TOKENS.yellow, 1);
-    g.lineStyle(3, TOKENS.ink, 1);
-    const headLen = 16;
+    g.lineStyle(6, TOKENS.ink, 1);
+    const headLen = 28;
     let p1x = 0, p1y = 0, p2x = 0, p2y = 0, p3x = 0, p3y = 0;
     if (dir === 'RIGHT') {
-      p1x = ex; p1y = ey - 10; p2x = ex; p2y = ey + 10; p3x = ex + headLen; p3y = ey;
+      p1x = ex; p1y = ey - 18; p2x = ex; p2y = ey + 18; p3x = ex + headLen; p3y = ey;
     } else if (dir === 'LEFT') {
-      p1x = ex; p1y = ey - 10; p2x = ex; p2y = ey + 10; p3x = ex - headLen; p3y = ey;
+      p1x = ex; p1y = ey - 18; p2x = ex; p2y = ey + 18; p3x = ex - headLen; p3y = ey;
     } else if (dir === 'UP') {
-      p1x = ex - 10; p1y = ey; p2x = ex + 10; p2y = ey; p3x = ex; p3y = ey - headLen;
+      p1x = ex - 18; p1y = ey; p2x = ex + 18; p2y = ey; p3x = ex; p3y = ey - headLen;
     } else {
-      p1x = ex - 10; p1y = ey; p2x = ex + 10; p2y = ey; p3x = ex; p3y = ey + headLen;
+      p1x = ex - 18; p1y = ey; p2x = ex + 18; p2y = ey; p3x = ex; p3y = ey + headLen;
     }
     g.fillTriangle(p1x, p1y, p2x, p2y, p3x, p3y);
     g.beginPath();

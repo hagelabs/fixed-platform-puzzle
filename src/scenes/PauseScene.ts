@@ -17,26 +17,26 @@ export class PauseScene extends Phaser.Scene {
     this.add.rectangle(cx, cy, width, height, TOKENS.cream, 0.92);
 
     this.add
-      .text(cx, cy - 160, 'PAUSED', {
+      .text(cx, cy - 288, 'PAUSED', {
         fontFamily: FONT_NEO,
-        fontSize: '40px',
+        fontSize: '72px',
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
 
-    neoButton(this, cx, cy - 70, 280, 60, 'RESUME', TOKENS.mint, () => {
+    neoButton(this, cx, cy - 126, 504, 108, 'RESUME', TOKENS.mint, () => {
       this.scene.resume(SCENE_KEYS.Game);
       this.scene.stop();
     });
 
     const audioLabel = () =>
       `SOUND: ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
-    const muteBtn = neoButton(this, cx, cy + 6, 280, 60, audioLabel(), TOKENS.sky, () => {
+    const muteBtn = neoButton(this, cx, cy + 10, 504, 108, audioLabel(), TOKENS.sky, () => {
       useGameStore.getState().toggleAudio();
       muteBtn.setLabel(audioLabel());
     });
 
-    neoButton(this, cx, cy + 82, 280, 60, 'RESTART', TOKENS.yellow, () => {
+    neoButton(this, cx, cy + 148, 504, 108, 'RESTART', TOKENS.yellow, () => {
       showConfirm(this, {
         title: 'RESTART LEVEL?',
         body: 'Your moves on this level will be lost.',
@@ -50,7 +50,7 @@ export class PauseScene extends Phaser.Scene {
       });
     });
 
-    neoButton(this, cx, cy + 158, 280, 60, 'MAIN MENU', TOKENS.danger, () => {
+    neoButton(this, cx, cy + 284, 504, 108, 'MAIN MENU', TOKENS.danger, () => {
       this.scene.stop(SCENE_KEYS.Game);
       this.scene.stop();
       this.scene.start(SCENE_KEYS.Menu);

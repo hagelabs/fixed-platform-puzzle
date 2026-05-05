@@ -20,10 +20,10 @@ export const TOKENS = {
   blue: 0x7fb7e8,
   blueHover: 0x6da6d8,
   danger: 0xf28b82,
-  shadowOffset: 3,
-  borderPx: 3,
-  cornerR: 10,
-  pillCornerR: 16,
+  shadowOffset: 6,
+  borderPx: 6,
+  cornerR: 18,
+  pillCornerR: 32,
   exitGlow: 0xff8a5b,
   exitGlowAccent: 0xffd96a,
 };
@@ -129,7 +129,7 @@ export function neoButton(
   onClick: () => void,
   opts: { textSize?: number; textColor?: string; hoverFill?: number } = {},
 ): NeoButtonHandle {
-  const textSize = opts.textSize ?? 22;
+  const textSize = opts.textSize ?? 40;
   const textColor = opts.textColor ?? TOKENS.inkHex;
   const hoverFill = opts.hoverFill ?? darken(fill, 0.08);
 
@@ -189,10 +189,10 @@ export function neoButton(
   container.on('pointerdown', () => {
     if (!enabled) return;
     pressed = true;
-    g.x = 2;
-    g.y = 2;
-    txt.x = 2;
-    txt.y = 2;
+    g.x = 4;
+    g.y = 4;
+    txt.x = 4;
+    txt.y = 4;
     animScale(0.98, 80);
   });
   container.on('pointerup', () => {
@@ -234,13 +234,13 @@ export function neoPill(
     scene,
     x,
     y,
-    opts.w ?? 64,
-    opts.h ?? 56,
+    opts.w ?? 116,
+    opts.h ?? 100,
     label,
     opts.fill ?? TOKENS.white,
     onClick,
     {
-      textSize: opts.textSize ?? 24,
+      textSize: opts.textSize ?? 44,
       textColor: opts.textColor ?? TOKENS.inkHex,
     },
   );
@@ -251,10 +251,10 @@ export function dottedBackground(scene: Phaser.Scene): void {
   scene.cameras.main.setBackgroundColor(TOKENS.creamHex);
   const g = scene.add.graphics();
   g.fillStyle(TOKENS.ink, 0.18);
-  const spacing = 22;
+  const spacing = 40;
   for (let y = spacing / 2; y < height; y += spacing) {
     for (let x = spacing / 2; x < width; x += spacing) {
-      g.fillCircle(x, y, 1.2);
+      g.fillCircle(x, y, 2.2);
     }
   }
   g.setDepth(-100);
@@ -264,18 +264,18 @@ export function drawLockIcon(
   scene: Phaser.Scene,
   x: number,
   y: number,
-  size: number = 28,
+  size: number = 50,
   color: number = 0x9a9a9a,
 ): Phaser.GameObjects.Graphics {
   const g = scene.add.graphics();
   g.fillStyle(color, 1);
   const bodyW = size;
   const bodyH = size * 0.78;
-  g.fillRoundedRect(x - bodyW / 2, y - bodyH / 2 + 4, bodyW, bodyH, 4);
+  g.fillRoundedRect(x - bodyW / 2, y - bodyH / 2 + 8, bodyW, bodyH, 8);
   g.lineStyle(Math.max(3, size * 0.13), color, 1);
   g.beginPath();
   const r = size * 0.32;
-  const cy = y - bodyH / 2 + 4;
+  const cy = y - bodyH / 2 + 8;
   g.arc(x, cy, r, Math.PI, 0, false);
   g.strokePath();
   return g;
@@ -338,7 +338,7 @@ export function slideUpIn(
   scene: Phaser.Scene,
   target: Phaser.GameObjects.Container,
   delay = 0,
-  fromOffset = 40,
+  fromOffset = 72,
 ): void {
   const baseY = target.y;
   target.y = baseY + fromOffset;
@@ -384,7 +384,7 @@ export function floatingDecor(
     const g = scene.add.graphics();
     const r = size * 0.12;
     const sep = r * 1.6;
-    g.lineStyle(Math.max(2.5, r * 0.4), TOKENS.ink, 1);
+    g.lineStyle(Math.max(4.5, r * 0.4), TOKENS.ink, 1);
     g.strokeCircle(-sep, 0, r);
     g.strokeCircle(sep, 0, r);
     g.fillStyle(TOKENS.ink, 1);
@@ -392,7 +392,7 @@ export function floatingDecor(
     tile.container.add(g);
   } else if (opts.icon === 'cross') {
     const g = scene.add.graphics();
-    g.lineStyle(3, TOKENS.ink, 0.6);
+    g.lineStyle(6, TOKENS.ink, 0.6);
     const m = size * 0.28;
     g.beginPath();
     g.moveTo(-m, -m); g.lineTo(m, m);
@@ -401,7 +401,7 @@ export function floatingDecor(
     tile.container.add(g);
   }
 
-  const bobAmt = opts.bobAmt ?? 6;
+  const bobAmt = opts.bobAmt ?? 11;
   const bobDur = opts.bobDur ?? 1800 + Math.random() * 800;
   const rotRange = opts.rotateRange ?? 5;
 

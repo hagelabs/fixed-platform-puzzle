@@ -1,12 +1,12 @@
 import { Color } from "../types/Game";
 
-export const GAME_WIDTH = 960;
-export const GAME_HEIGHT = 600;
+export const GAME_WIDTH = 1920;
+export const GAME_HEIGHT = 1080;
 
-export const CELL_SIZE = 80;
-export const BOARD_PADDING = 16;
+export const CELL_SIZE = 144;
+export const BOARD_PADDING = 32;
 
-export const HUD_HEIGHT = 70;
+export const HUD_HEIGHT = 126;
 
 export const COLORS: Record<Color, number> = {
   red: 0xe56b6f,

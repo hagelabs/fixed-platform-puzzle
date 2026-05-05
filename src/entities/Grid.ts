@@ -23,14 +23,14 @@ export class Grid {
 
     const screenW = scene.scale.width;
     const screenH = scene.scale.height;
-    const maxByW = (screenW - 80) / cols;
-    const maxByH = (screenH - HUD_HEIGHT - 120) / rows;
+    const maxByW = (screenW - 120) / cols;
+    const maxByH = (screenH - HUD_HEIGHT - 320) / rows;
     this.cellSize = Math.min(CELL_SIZE, maxByW, maxByH);
 
     const boardW = this.cellSize * cols;
     const boardH = this.cellSize * rows;
     this.originX = (screenW - boardW) / 2;
-    this.originY = HUD_HEIGHT + 30 + (screenH - HUD_HEIGHT - 30 - 60 - boardH) / 2;
+    this.originY = HUD_HEIGHT + 40 + (screenH - HUD_HEIGHT - 40 - 240 - boardH) / 2;
 
     this.occupancy = Array.from({ length: rows }, () => Array(cols).fill(null));
     this.drawBoard(scene);
@@ -40,14 +40,14 @@ export class Grid {
   private drawBoard(scene: Phaser.Scene): void {
     const w = this.cellSize * this.cols;
     const h = this.cellSize * this.rows;
-    const pad = 12;
+    const pad = 24;
     const bx = this.originX - pad;
     const by = this.originY - pad;
     const bw = w + pad * 2;
     const bh = h + pad * 2;
-    const cornerR = 14;
-    const shadowOffset = 3;
-    const borderPx = 3;
+    const cornerR = 25;
+    const shadowOffset = 6;
+    const borderPx = 6;
 
     const g = scene.add.graphics();
     this.createdObjects.push(g);
@@ -61,17 +61,17 @@ export class Grid {
     const dots = scene.add.graphics();
     this.createdObjects.push(dots);
     dots.fillStyle(TOKENS.ink, 0.14);
-    const dotStep = Math.max(16, this.cellSize / 4);
+    const dotStep = Math.max(28, this.cellSize / 4);
     for (let dy = this.originY + dotStep / 2; dy < this.originY + h; dy += dotStep) {
       for (let dx = this.originX + dotStep / 2; dx < this.originX + w; dx += dotStep) {
-        dots.fillCircle(dx, dy, 1);
+        dots.fillCircle(dx, dy, 2.5);
       }
     }
   }
 
   private drawExits(scene: Phaser.Scene): void {
-    const thickness = 10;
-    const inset = 6;
+    const thickness = 26;
+    const inset = 12;
     for (const e of this.exits) {
       const exitCenter = this.exitCenter(e);
       const isHoriz = e.side === 'LEFT' || e.side === 'RIGHT';
@@ -90,10 +90,10 @@ export class Grid {
         );
         portal.fillStyle(TOKENS.exitGlow, 1);
         portal.fillRoundedRect(
-          exitCenter.x - len / 2 + 2,
-          this.originY - thickness,
-          len - 4,
-          thickness - 4,
+          exitCenter.x - len / 2 + 6,
+          this.originY - thickness + 4,
+          len - 12,
+          thickness - 10,
           3,
         );
       } else if (e.side === 'BOTTOM') {
@@ -106,10 +106,10 @@ export class Grid {
         );
         portal.fillStyle(TOKENS.exitGlow, 1);
         portal.fillRoundedRect(
-          exitCenter.x - len / 2 + 2,
-          this.originY + this.rows * this.cellSize + 4,
-          len - 4,
-          thickness - 4,
+          exitCenter.x - len / 2 + 6,
+          this.originY + this.rows * this.cellSize + 8,
+          len - 12,
+          thickness - 12,
           3,
         );
       } else if (e.side === 'LEFT') {
@@ -122,10 +122,10 @@ export class Grid {
         );
         portal.fillStyle(TOKENS.exitGlow, 1);
         portal.fillRoundedRect(
-          this.originX - thickness,
-          exitCenter.y - len / 2 + 2,
-          thickness - 4,
-          len - 4,
+          this.originX - thickness + 4,
+          exitCenter.y - len / 2 + 6,
+          thickness - 10,
+          len - 12,
           3,
         );
       } else {
@@ -138,10 +138,10 @@ export class Grid {
         );
         portal.fillStyle(TOKENS.exitGlow, 1);
         portal.fillRoundedRect(
-          this.originX + this.cols * this.cellSize + 4,
-          exitCenter.y - len / 2 + 2,
-          thickness - 4,
-          len - 4,
+          this.originX + this.cols * this.cellSize + 8,
+          exitCenter.y - len / 2 + 6,
+          thickness - 12,
+          len - 12,
           3,
         );
       }

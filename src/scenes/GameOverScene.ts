@@ -26,9 +26,9 @@ export class GameOverScene extends Phaser.Scene {
     if (win) confetti(this);
 
     this.add
-      .text(cx, cy - 180, win ? 'CLEARED!' : 'STUCK!', {
+      .text(cx, cy - 324, win ? 'CLEARED!' : 'STUCK!', {
         fontFamily: FONT_NEO,
-        fontSize: '52px',
+        fontSize: '94px',
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
@@ -36,11 +36,11 @@ export class GameOverScene extends Phaser.Scene {
     this.add
       .text(
         cx,
-        cy - 120,
+        cy - 216,
         win ? 'Nice work.' : 'No more moves available',
         {
           fontFamily: FONT_NEO,
-          fontSize: '14px',
+          fontSize: '26px',
           color: TOKENS.inkHex,
         },
       )
@@ -48,15 +48,15 @@ export class GameOverScene extends Phaser.Scene {
       .setAlpha(0.65);
 
     this.add
-      .text(cx, cy - 70, `LEVEL ${store.currentLevel} · ${store.movesThisLevel} MOVES`, {
+      .text(cx, cy - 126, `LEVEL ${store.currentLevel} · ${store.movesThisLevel} MOVES`, {
         fontFamily: FONT_NEO,
-        fontSize: '18px',
+        fontSize: '32px',
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
 
     if (win && store.currentLevel < TOTAL_LEVELS) {
-      neoButton(this, cx, cy + 10, 280, 60, 'NEXT LEVEL', TOKENS.mint, () => {
+      neoButton(this, cx, cy + 18, 504, 108, 'NEXT LEVEL', TOKENS.mint, () => {
         useGameStore.getState().setCurrentLevel(store.currentLevel + 1);
         fadeOutAndStart(this, SCENE_KEYS.Game);
       });
@@ -64,13 +64,13 @@ export class GameOverScene extends Phaser.Scene {
       this.add
         .text(cx, cy + 10, 'ALL LEVELS DONE', {
           fontFamily: FONT_NEO,
-          fontSize: '24px',
+          fontSize: '44px',
           color: TOKENS.inkHex,
         })
         .setOrigin(0.5);
     } else {
       let busy = false;
-      neoButton(this, cx, cy + 10, 280, 60, 'CONTINUE (AD)', TOKENS.sky, async () => {
+      neoButton(this, cx, cy + 18, 504, 108, 'CONTINUE (AD)', TOKENS.sky, async () => {
         if (busy) return;
         busy = true;
         try {
@@ -82,11 +82,11 @@ export class GameOverScene extends Phaser.Scene {
       });
     }
 
-    neoButton(this, cx, cy + 86, 280, 60, 'RETRY', TOKENS.yellow, () => {
+    neoButton(this, cx, cy + 154, 504, 108, 'RETRY', TOKENS.yellow, () => {
       fadeOutAndStart(this, SCENE_KEYS.Game);
     });
 
-    neoButton(this, cx, cy + 162, 280, 60, 'MAIN MENU', TOKENS.danger, () => {
+    neoButton(this, cx, cy + 290, 504, 108, 'MAIN MENU', TOKENS.danger, () => {
       fadeOutAndStart(this, SCENE_KEYS.Menu);
     });
   }

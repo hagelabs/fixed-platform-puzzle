@@ -40,8 +40,8 @@ export class Block extends Phaser.GameObjects.Container {
     this.dependsOn = data.dependsOn;
     this.allowedExits = data.allowedExits ?? ['TOP', 'BOTTOM', 'LEFT', 'RIGHT'];
 
-    const pxW = w * grid.cellSize - 8;
-    const pxH = h * grid.cellSize - 8;
+    const pxW = w * grid.cellSize - 14;
+    const pxH = h * grid.cellSize - 14;
     this.bodyW = pxW;
     this.bodyH = pxH;
     const hitW = w * grid.cellSize;
@@ -95,14 +95,14 @@ export class Block extends Phaser.GameObjects.Container {
     );
 
     if (this.type === 'obstacle') {
-      g.lineStyle(2, TOKENS.ink, 0.55);
-      const inset = borderPx + 4;
+      g.lineStyle(4, TOKENS.ink, 0.55);
+      const inset = borderPx + 8;
       const minX = -w / 2 + inset;
       const maxX = w / 2 - inset;
       const minY = -h / 2 + inset;
       const maxY = h / 2 - inset;
       const span = Math.max(w, h);
-      const step = 10;
+      const step = 18;
       for (let off = -span; off <= span; off += step) {
         const x1 = minX + off;
         const y1 = minY;

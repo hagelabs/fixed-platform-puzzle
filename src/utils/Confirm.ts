@@ -22,8 +22,8 @@ export function showConfirm(scene: Phaser.Scene, opts: ConfirmOptions): void {
   dim.setInteractive();
   layer.add(dim);
 
-  const dialogW = 440;
-  const dialogH = 240;
+  const dialogW = 800;
+  const dialogH = 430;
   const cornerR = TOKENS.cornerR;
   const shadow = TOKENS.shadowOffset;
   const border = TOKENS.borderPx;
@@ -44,21 +44,21 @@ export function showConfirm(scene: Phaser.Scene, opts: ConfirmOptions): void {
   layer.add(g);
 
   const titleTxt = scene.add
-    .text(cx, cy - 70, opts.title, {
+    .text(cx, cy - 126, opts.title, {
       fontFamily: FONT_NEO,
-      fontSize: '24px',
+      fontSize: '44px',
       color: TOKENS.inkHex,
     })
     .setOrigin(0.5);
   layer.add(titleTxt);
 
   const bodyTxt = scene.add
-    .text(cx, cy - 16, opts.body, {
+    .text(cx, cy - 30, opts.body, {
       fontFamily: FONT_NEO,
-      fontSize: '13px',
+      fontSize: '24px',
       color: TOKENS.inkHex,
       align: 'center',
-      wordWrap: { width: dialogW - 36 },
+      wordWrap: { width: dialogW - 64 },
     })
     .setOrigin(0.5)
     .setAlpha(0.7);
@@ -71,27 +71,27 @@ export function showConfirm(scene: Phaser.Scene, opts: ConfirmOptions): void {
 
   const yes = neoButton(
     scene,
-    cx - 100,
-    cy + 64,
-    160,
-    50,
+    cx - 180,
+    cy + 115,
+    280,
+    90,
     opts.yesLabel ?? 'YES',
     opts.yesColor ?? TOKENS.danger,
     () => close(opts.onYes),
-    { textSize: 16 },
+    { textSize: 28 },
   );
   layer.add(yes.container);
 
   const no = neoButton(
     scene,
-    cx + 100,
-    cy + 64,
-    160,
-    50,
+    cx + 180,
+    cy + 115,
+    280,
+    90,
     opts.noLabel ?? 'CANCEL',
     TOKENS.sky,
     () => close(opts.onNo),
-    { textSize: 16 },
+    { textSize: 28 },
   );
   layer.add(no.container);
 }

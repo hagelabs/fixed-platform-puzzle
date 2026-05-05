@@ -121,23 +121,23 @@ export class TutorialScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setAlpha(0.6);
 
-    neoPill(this, 108, 64, '<', () => this.exit(false), {
-      w: 64,
-      h: 44,
+    neoPill(this, 120, 100, '<', () => this.exit(false), {
+      w: 140,
+      h: 100,
       fill: TOKENS.white,
-      textSize: 40,
+      textSize: 46,
     });
 
     neoButton(
       this,
-      this.scale.width - 80,
-      36,
-      120,
-      40,
+      this.scale.width - 140,
+      100,
+      180,
+      72,
       'SKIP',
       TOKENS.danger,
       () => this.exit(true),
-      { textSize: 26 },
+      { textSize: 32 },
     );
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

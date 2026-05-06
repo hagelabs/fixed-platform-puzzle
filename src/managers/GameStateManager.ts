@@ -2,8 +2,7 @@ import { createStore } from 'zustand/vanilla';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { TOTAL_LEVELS } from '../config/Constants';
 
-export const WATCH_MAX = 5;
-export const WATCH_RESET_MS = 10 * 60 * 1000;
+export const WATCH_COOLDOWN_MS = 3 * 60 * 1000;
 
 interface GameState {
   currentLevel: number;
@@ -12,8 +11,7 @@ interface GameState {
   audioEnabled: boolean;
   tutorialDone: boolean;
 
-  watchCredits: number;
-  watchLastConsumedAt: number;
+  watchCooldownUntil: number;
 
   setCurrentLevel: (n: number) => void;
   unlockNext: () => void;
@@ -24,10 +22,9 @@ interface GameState {
   resetProgress: () => void;
   unlockAll: () => void;
 
-  refreshWatchCredits: () => void;
-  consumeWatch: () => boolean;
-  getWatchCredits: () => number;
-  getWatchResetSecondsLeft: () => number;
+  startWatchCooldown: () => void;
+  isWatchOnCooldown: () => boolean;
+  getWatchCooldownSecondsLeft: () => number;
 }
 
 const store = createStore<GameState>()(
@@ -39,8 +36,7 @@ const store = createStore<GameState>()(
       audioEnabled: true,
       tutorialDone: false,
 
-      watchCredits: WATCH_MAX,
-      watchLastConsumedAt: 0,
+      watchCooldownUntil: 0,
 
       setCurrentLevel: (n) => set({ currentLevel: n, movesThisLevel: 0 }),
       unlockNext: () =>
@@ -54,36 +50,14 @@ const store = createStore<GameState>()(
       resetProgress: () =>
         set({
           currentLevel: 1, unlockedLevel: 1, movesThisLevel: 0, tutorialDone: false,
-          watchCredits: WATCH_MAX, watchLastConsumedAt: 0,
+          watchCooldownUntil: 0,
         }),
       unlockAll: () => set({ unlockedLevel: TOTAL_LEVELS }),
 
-      refreshWatchCredits: () => {
-        const s = get();
-        if (s.watchCredits >= WATCH_MAX) return;
-        const elapsed = Date.now() - s.watchLastConsumedAt;
-        if (elapsed >= WATCH_RESET_MS) {
-          set({ watchCredits: WATCH_MAX, watchLastConsumedAt: 0 });
-        }
-      },
-      consumeWatch: () => {
-        get().refreshWatchCredits();
-        const s = get();
-        if (s.watchCredits <= 0) return false;
-        set({
-          watchCredits: s.watchCredits - 1,
-          watchLastConsumedAt: s.watchLastConsumedAt === 0 ? Date.now() : s.watchLastConsumedAt,
-        });
-        return true;
-      },
-      getWatchCredits: () => {
-        get().refreshWatchCredits();
-        return get().watchCredits;
-      },
-      getWatchResetSecondsLeft: () => {
-        const s = get();
-        if (s.watchCredits >= WATCH_MAX || s.watchLastConsumedAt === 0) return 0;
-        const remain = WATCH_RESET_MS - (Date.now() - s.watchLastConsumedAt);
+      startWatchCooldown: () => set({ watchCooldownUntil: Date.now() + WATCH_COOLDOWN_MS }),
+      isWatchOnCooldown: () => Date.now() < get().watchCooldownUntil,
+      getWatchCooldownSecondsLeft: () => {
+        const remain = get().watchCooldownUntil - Date.now();
         return Math.max(0, Math.ceil(remain / 1000));
       },
     }),
@@ -95,8 +69,7 @@ const store = createStore<GameState>()(
         unlockedLevel: s.unlockedLevel,
         audioEnabled: s.audioEnabled,
         tutorialDone: s.tutorialDone,
-        watchCredits: s.watchCredits,
-        watchLastConsumedAt: s.watchLastConsumedAt,
+        watchCooldownUntil: s.watchCooldownUntil,
       }) as Partial<GameState>,
     }
   )

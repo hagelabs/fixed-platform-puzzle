@@ -37,13 +37,10 @@ export class GameScene extends Phaser.Scene {
   private history: MoveHistoryEntry[] = [];
 
   private movesText!: Phaser.GameObjects.Text;
-  private hintBtn!: NeoButtonHandle;
   private undoBtn!: NeoButtonHandle;
   private watchBtn!: NeoButtonHandle;
-  private watchLabel!: Phaser.GameObjects.Text;
   private deadEndShown = false;
 
-  private hintBusy = false;
   private hovered: Block | null = null;
   private busy = false;
   private watchPlaying = false;
@@ -150,48 +147,30 @@ export class GameScene extends Phaser.Scene {
     );
 
     const bottomY = this.scale.height - 55;
-    const btnW = 210;
-    const btnSpacing = 230;
+    const btnW = 220;
+    const btnSpacing = 240;
     this.undoBtn = neoButton(
       this,
-      width / 2 - btnSpacing * 1.5,
+      width / 2 - btnSpacing,
       bottomY,
       btnW,
       86,
       'UNDO',
       TOKENS.yellow,
       () => this.undo(),
-      { textSize: 32 },
-    );
-    this.hintBtn = neoButton(
-      this,
-      width / 2 - btnSpacing * 0.5,
-      bottomY,
-      btnW,
-      86,
-      'HINT',
-      TOKENS.sky,
-      () => this.requestHint(),
-      { textSize: 32 },
+      { textSize: 34 },
     );
     this.watchBtn = neoButton(
       this,
-      width / 2 + btnSpacing * 0.5,
+      width / 2,
       bottomY,
       btnW,
       86,
       'WATCH',
       TOKENS.mint,
       () => this.requestWatch(),
-      { textSize: 30 },
+      { textSize: 28 },
     );
-    this.watchLabel = this.add
-      .text(width / 2 + btnSpacing * 0.5, bottomY + 56, '', {
-        fontFamily: FONT_NEO,
-        fontSize: '20px',
-        color: TOKENS.inkHex,
-      })
-      .setOrigin(0.5);
     this.refreshWatchLabel();
     this.time.addEvent({
       delay: 1000,
@@ -200,45 +179,58 @@ export class GameScene extends Phaser.Scene {
     });
     neoButton(
       this,
-      width / 2 + btnSpacing * 1.5,
+      width / 2 + btnSpacing,
       bottomY,
       btnW,
       86,
       'RESTART',
       TOKENS.danger,
       () => this.scene.restart(),
-      { textSize: 32 },
+      { textSize: 34 },
     );
   }
 
   private refreshWatchLabel(): void {
     const store = useGameStore.getState();
-    const credits = store.getWatchCredits();
-    const sec = store.getWatchResetSecondsLeft();
-    if (credits > 0) {
-      this.watchLabel.setText(`${credits}/5 LEFT`);
+    if (SDKManager.hasRewardedAds()) {
+      this.watchBtn.setLabel('WATCH AD');
+      this.watchBtn.setEnabled(!this.watchPlaying);
+      return;
+    }
+    const sec = store.getWatchCooldownSecondsLeft();
+    if (sec <= 0) {
+      this.watchBtn.setLabel('WATCH');
+      this.watchBtn.setEnabled(!this.watchPlaying);
     } else {
       const m = Math.floor(sec / 60);
       const s = sec % 60;
-      this.watchLabel.setText(`RESET ${m}:${String(s).padStart(2, '0')}`);
+      this.watchBtn.setLabel(`${m}:${String(s).padStart(2, '0')}`);
+      this.watchBtn.setEnabled(false);
     }
-    this.watchBtn.setEnabled(credits > 0 && !this.watchPlaying);
   }
 
   private async requestWatch(): Promise<void> {
     if (this.watchPlaying || this.busy) return;
-    const store = useGameStore.getState();
-    if (store.getWatchCredits() <= 0) {
-      AudioManager.thud();
-      this.refreshWatchLabel();
-      return;
-    }
-    if (!store.consumeWatch()) {
-      AudioManager.thud();
-      this.refreshWatchLabel();
-      return;
-    }
     AudioManager.uiTap();
+
+    if (SDKManager.hasRewardedAds()) {
+      this.watchBtn.setEnabled(false);
+      const ok = await AdManager.showRewarded('hint');
+      if (!ok) {
+        AudioManager.thud();
+        this.refreshWatchLabel();
+        return;
+      }
+    } else {
+      const store = useGameStore.getState();
+      if (store.isWatchOnCooldown()) {
+        AudioManager.thud();
+        this.refreshWatchLabel();
+        return;
+      }
+      store.startWatchCooldown();
+    }
+
     Analytics.log('hint_used', { type: 'watch_solution' });
     this.refreshWatchLabel();
 
@@ -256,7 +248,6 @@ export class GameScene extends Phaser.Scene {
     }
     this.watchPlaying = true;
     this.undoBtn.setEnabled(false);
-    this.hintBtn.setEnabled(false);
     this.watchBtn.setEnabled(false);
     this.refreshWatchLabel();
 
@@ -274,7 +265,6 @@ export class GameScene extends Phaser.Scene {
     await this.waitUntilIdle();
     this.watchPlaying = false;
     this.undoBtn.setEnabled(true);
-    this.hintBtn.setEnabled(true);
     this.refreshWatchLabel();
   }
 
@@ -318,50 +308,6 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     this.add.container(x, y, [g, txt]);
-  }
-
-  private async requestHint(): Promise<void> {
-    if (this.hintBusy) return;
-    this.hintBusy = true;
-    this.hintBtn.setEnabled(false);
-
-    AudioManager.uiTap();
-    Analytics.log('hint_used');
-    try {
-      const ok = await AdManager.showRewarded('hint');
-      if (!ok) return;
-
-      const exitMove = this.movement.findAnyExit(this.blocks, this.grid);
-      const target = exitMove?.block ?? this.findFirstMovable();
-      if (!target) return;
-
-      this.tweens.add({
-        targets: target,
-        scale: 1.15,
-        duration: 200,
-        yoyo: true,
-        repeat: 2,
-        onComplete: () => target.setScale(1),
-      });
-    } finally {
-      this.hintBusy = false;
-      this.hintBtn.setEnabled(true);
-    }
-  }
-
-  private findFirstMovable(): Block | null {
-    const dirs: Direction[] = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
-    return (
-      this.blocks.find(
-        (b) =>
-          !b.removed &&
-          b.type !== 'obstacle' &&
-          dirs.some((d) => {
-            const r = this.movement.slide(b, this.grid, d, this.blocks);
-            return r.kind === 'exit' || (r.kind === 'slide' && r.distance > 0);
-          }),
-      ) ?? null
-    );
   }
 
   private undo(): void {

@@ -52,6 +52,14 @@ class SDKManagerImpl {
     return 'none';
   }
 
+  getPlatform(): Platform {
+    return this.platform;
+  }
+
+  hasRewardedAds(): boolean {
+    return this.platform === 'poki' || this.platform === 'crazygames';
+  }
+
   async init(): Promise<void> {
     this.platform = this.detect();
     try {
@@ -161,10 +169,6 @@ class SDKManagerImpl {
 
   private dummyRewarded(): Promise<boolean> {
     return new Promise((resolve) => setTimeout(() => resolve(true), 700));
-  }
-
-  getPlatform(): Platform {
-    return this.platform;
   }
 }
 

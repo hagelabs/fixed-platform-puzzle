@@ -3,6 +3,7 @@ import { BlockData, Color, BlockType, ExitSide, Direction } from '../types/Game'
 import { COLORS } from '../config/Constants';
 import { TOKENS } from '../ui/Theme';
 import { Grid } from './Grid';
+import { AudioManager } from '../managers/AudioManager';
 
 export class Block extends Phaser.GameObjects.Container {
   public readonly blockId: string;
@@ -219,6 +220,7 @@ export class Block extends Phaser.GameObjects.Container {
     if (this.type === 'dependent' && this.locked) return;
     if (this.hovered === state) return;
     this.hovered = state;
+    if (state) AudioManager.hover();
     this.scene.tweens.add({
       targets: this,
       scale: state ? 1.05 : 1,

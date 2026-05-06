@@ -34,6 +34,7 @@ export class MenuScene extends Phaser.Scene {
   create(): void {
     fadeIn(this);
     dottedBackground(this);
+    AudioManager.menuOpen();
     this.demoBlocks = [];
 
     this.spawnAmbientDecor();
@@ -131,7 +132,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const audioLabel = () =>
-      `SOUND: ${useGameStore.getState().audioEnabled ? 'ON' : 'OFF'}`;
+      `SOUND: ${useGameStore.getState().sfxEnabled ? 'ON' : 'OFF'}`;
     const audioBtn = neoPill(
       this,
       width - 150,

@@ -8,7 +8,8 @@ interface GameState {
   currentLevel: number;
   unlockedLevel: number;
   movesThisLevel: number;
-  audioEnabled: boolean;
+  sfxEnabled: boolean;
+  audioEnabled: boolean; // alias of sfxEnabled (kept for legacy reads)
   tutorialDone: boolean;
 
   watchCooldownUntil: number;
@@ -33,6 +34,7 @@ const store = createStore<GameState>()(
       currentLevel: 1,
       unlockedLevel: 1,
       movesThisLevel: 0,
+      sfxEnabled: true,
       audioEnabled: true,
       tutorialDone: false,
 
@@ -45,7 +47,11 @@ const store = createStore<GameState>()(
         })),
       incMoves: () => set((s) => ({ movesThisLevel: s.movesThisLevel + 1 })),
       resetMoves: () => set({ movesThisLevel: 0 }),
-      toggleAudio: () => set((s) => ({ audioEnabled: !s.audioEnabled })),
+      toggleAudio: () =>
+        set((s) => {
+          const next = !s.sfxEnabled;
+          return { sfxEnabled: next, audioEnabled: next };
+        }),
       setTutorialDone: (v) => set({ tutorialDone: v }),
       resetProgress: () =>
         set({
@@ -67,10 +73,23 @@ const store = createStore<GameState>()(
       partialize: (s) => ({
         currentLevel: s.currentLevel,
         unlockedLevel: s.unlockedLevel,
+        sfxEnabled: s.sfxEnabled,
         audioEnabled: s.audioEnabled,
         tutorialDone: s.tutorialDone,
         watchCooldownUntil: s.watchCooldownUntil,
       }) as Partial<GameState>,
+      migrate: (persisted: unknown) => {
+        if (persisted && typeof persisted === 'object') {
+          const p = persisted as Record<string, unknown>;
+          if (p.sfxEnabled === undefined && typeof p.audioEnabled === 'boolean') {
+            p.sfxEnabled = p.audioEnabled;
+          }
+          if (p.audioEnabled === undefined && typeof p.sfxEnabled === 'boolean') {
+            p.audioEnabled = p.sfxEnabled;
+          }
+        }
+        return persisted as GameState;
+      },
     }
   )
 );

@@ -45,6 +45,9 @@ export class GameScene extends Phaser.Scene {
   private busy = false;
   private watchPlaying = false;
   private autoplayActive = false;
+  private lastRemovalAt = 0;
+  private comboCount = 0;
+  private prevLocked = new Map<string, boolean>();
 
   constructor() {
     super({ key: SCENE_KEYS.Game });
@@ -86,13 +89,21 @@ export class GameScene extends Phaser.Scene {
 
     this.input2.setBlocks(this.blocks);
 
+    // Snapshot initial locked state for unlockChime detection
+    this.prevLocked.clear();
+    for (const b of this.blocks) {
+      if (b.type === 'dependent') this.prevLocked.set(b.blockId, b.isLocked());
+    }
+
     this.drawHud();
+    AudioManager.startAmbient();
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       SDKManager.gameplayStop();
       this.input.off('pointermove', this.refreshHover, this);
       this.events.off('block:settled', this.refreshHover, this);
       this.hovered = null;
+      AudioManager.stopAmbient();
     });
 
     if (this.registry.get('autoplaySolution')) {
@@ -139,7 +150,7 @@ export class GameScene extends Phaser.Scene {
       headerY,
       'II',
       () => {
-        AudioManager.uiTap();
+        AudioManager.pauseSwoosh();
         this.scene.launch(SCENE_KEYS.Pause);
         this.scene.pause();
       },
@@ -206,6 +217,7 @@ export class GameScene extends Phaser.Scene {
       const s = sec % 60;
       this.watchBtn.setLabel(`${m}:${String(s).padStart(2, '0')}`);
       this.watchBtn.setEnabled(false);
+      if (sec > 0 && sec <= 3) AudioManager.tick();
     }
   }
 
@@ -257,6 +269,7 @@ export class GameScene extends Phaser.Scene {
       const block = this.blocks.find((b) => b.blockId === mv.blockId);
       if (!block || block.removed) continue;
       this.autoplayActive = true;
+      AudioManager.aiStep();
       this.handleSwipe(block, mv.dir);
       this.autoplayActive = false;
       // small visual gap between moves
@@ -334,18 +347,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleSwipe(block: Block, dir: Direction): void {
-    if (this.busy) return;
+    if (this.busy) {
+      AudioManager.bump();
+      return;
+    }
     if (this.watchPlaying && !this.autoplayActive) return;
     if (block.removed || block.type === 'obstacle') return;
 
     const result = this.movement.slide(block, this.grid, dir, this.blocks);
 
     if (result.kind === 'invalid') {
-      AudioManager.thud();
+      if (result.reason === 'wrong_dir') AudioManager.constraintReject();
+      else if (result.reason === 'locked') AudioManager.thud();
+      else AudioManager.bump();
       this.shake(block);
       Analytics.log('hint_used', { invalid: result.reason });
       return;
     }
+
+    const pan = this.computePan(block.gridPos[0]);
 
     Analytics.log('block_moved', { dir, color: block.color, kind: result.kind });
     const store = useGameStore.getState();
@@ -362,12 +382,13 @@ export class GameScene extends Phaser.Scene {
       block.gridPos = [result.toCol, result.toRow];
       this.grid.place(block);
       this.busy = true;
+      AudioManager.slideStart(result.distance, pan);
       block.moveToCell(this.grid, result.toCol, result.toRow, true, result.distance);
       this.time.delayedCall(Math.min(360, 90 + result.distance * 38), () => {
         block.squash(dir);
         dustPuff(this, block.x, block.y, dir);
         screenshake(this, 0.003, 80);
-        AudioManager.click();
+        AudioManager.slideEnd(result.distance, this.computePan(result.toCol));
         this.busy = false;
         this.events.emit('tutorial:moved');
         this.checkDeadEnd();
@@ -384,7 +405,8 @@ export class GameScene extends Phaser.Scene {
     this.grid.clear(block);
     block.gridPos = [result.toCol, result.toRow];
     this.busy = true;
-    AudioManager.pop();
+    this.handleCombo();
+    AudioManager.pop(this.computePan(result.toCol));
     removalBloom(this, block.x, block.y, COLORS[block.color]);
     burstParticles(this, block.x, block.y, COLORS[block.color], 10);
     screenshake(this, 0.004, 100);
@@ -397,10 +419,35 @@ export class GameScene extends Phaser.Scene {
   }
 
   private refreshDependents(): void {
+    let unlockedAny = false;
     for (const b of this.blocks) {
       if (b.removed) continue;
-      if (b.type === 'dependent') b.refreshDependency(this.blocks);
+      if (b.type !== 'dependent') continue;
+      b.refreshDependency(this.blocks);
+      const wasLocked = this.prevLocked.get(b.blockId) ?? true;
+      const nowLocked = b.isLocked();
+      if (wasLocked && !nowLocked) unlockedAny = true;
+      this.prevLocked.set(b.blockId, nowLocked);
     }
+    if (unlockedAny) AudioManager.unlockChime();
+  }
+
+  private computePan(col: number): number {
+    const cols = this.grid?.cols ?? 1;
+    if (cols <= 1) return 0;
+    const norm = (col / (cols - 1)) * 2 - 1;
+    return Math.max(-0.7, Math.min(0.7, norm));
+  }
+
+  private handleCombo(): void {
+    const now = performance.now();
+    if (now - this.lastRemovalAt <= 800) {
+      this.comboCount++;
+      if (this.comboCount >= 2) AudioManager.combo(this.comboCount);
+    } else {
+      this.comboCount = 1;
+    }
+    this.lastRemovalAt = now;
   }
 
   private shake(block: Block): void {
@@ -434,6 +481,7 @@ export class GameScene extends Phaser.Scene {
         reason: 'dead_end',
         moves: useGameStore.getState().movesThisLevel,
       });
+      AudioManager.deadEnd();
       deadEndPulse(this);
       remaining.forEach((b) => b.pulseRed());
       this.time.delayedCall(900, () => this.endLevel('STUCK'));
@@ -451,8 +499,9 @@ export class GameScene extends Phaser.Scene {
         moves: store.movesThisLevel,
       });
     } else {
-      AudioManager.thud();
+      AudioManager.levelFail();
     }
+    AudioManager.stopAmbient();
     SDKManager.gameplayStop();
     this.time.delayedCall(500, () => {
       fadeOutAndStart(this, SCENE_KEYS.GameOver, { result });

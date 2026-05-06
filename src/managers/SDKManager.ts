@@ -1,3 +1,5 @@
+import { AudioManager } from './AudioManager';
+
 type Platform = 'poki' | 'crazygames' | 'none';
 type RewardedSize = 'small' | 'medium' | 'large';
 
@@ -117,6 +119,7 @@ class SDKManagerImpl {
   async commercialBreak(): Promise<void> {
     if (this.adInFlight) return;
     this.adInFlight = true;
+    AudioManager.duckForAd(true);
     try {
       if (this.platform === 'poki' && window.PokiSDK?.commercialBreak) {
         this.gameplayStop();
@@ -129,12 +132,14 @@ class SDKManagerImpl {
       console.warn('[ad] commercialBreak failed', e);
     } finally {
       this.adInFlight = false;
+      AudioManager.duckForAd(false);
     }
   }
 
   async rewarded(size: RewardedSize = 'medium'): Promise<boolean> {
     if (this.adInFlight) return false;
     this.adInFlight = true;
+    AudioManager.duckForAd(true);
     try {
       if (this.platform === 'poki' && window.PokiSDK?.rewardedBreak) {
         const result = await this.withTimeout(
@@ -153,6 +158,7 @@ class SDKManagerImpl {
       return false;
     } finally {
       this.adInFlight = false;
+      AudioManager.duckForAd(false);
     }
   }
 

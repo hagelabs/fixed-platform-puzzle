@@ -17,7 +17,7 @@ export const COLORS: Record<Color, number> = {
   orange: 0xf2a76b,
 };
 
-export const DRAG_THRESHOLD = 8;
+export const DRAG_THRESHOLD = 5;
 export const TOTAL_LEVELS = 50;
 
 export const SCENE_KEYS = {

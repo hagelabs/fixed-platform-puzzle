@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { gameConfig } from './config/GameConfig';
 import { SDKManager } from './managers/SDKManager';
 import { Analytics } from './managers/AnalyticsManager';
+import { AudioManager } from './managers/AudioManager';
 
 async function waitForFonts(): Promise<void> {
   if (!('fonts' in document)) return;
@@ -53,9 +54,24 @@ function emitReady(): void {
   window.dispatchEvent(new Event('fpp:ready'));
 }
 
+function installAudioUnlock(): void {
+  const unlock = (): void => {
+    AudioManager.unlock();
+  };
+  ['pointerdown', 'touchstart', 'keydown'].forEach((ev) => {
+    document.addEventListener(ev, unlock, { capture: true, passive: true });
+  });
+  // Also unlock on visibility-restore so a backgrounded ctx wakes immediately on next gesture.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) AudioManager.unlock();
+  });
+  (window as unknown as { AudioManager?: typeof AudioManager }).AudioManager = AudioManager;
+}
+
 window.addEventListener('load', async () => {
   emitProgress(20, 'Initializing...');
   patchTextResolution();
+  installAudioUnlock();
 
   emitProgress(35, 'Connecting SDK...');
   const sdkPromise = SDKManager.init().then(() => emitProgress(60, 'Loading fonts...'));

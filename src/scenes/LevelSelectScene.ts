@@ -25,6 +25,7 @@ export class LevelSelectScene extends Phaser.Scene {
   create(): void {
     fadeIn(this);
     dottedBackground(this);
+    AudioManager.menuOpen();
     this.spawnAmbientDecor();
 
     const { width, height } = this.scale;

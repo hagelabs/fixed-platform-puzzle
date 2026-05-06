@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Block } from '../entities/Block';
 import { Direction } from '../types/Game';
 import { DRAG_THRESHOLD } from '../config/Constants';
+import { AudioManager } from './AudioManager';
 
 export type SwipeAttempt = (block: Block, direction: Direction) => void;
 
@@ -37,6 +38,7 @@ export class InputManager {
       if (b.containsPointer(pointer.worldX, pointer.worldY)) {
         this.dragStart = { x: pointer.x, y: pointer.y };
         this.dragBlock = b;
+        AudioManager.grab();
         return;
       }
     }

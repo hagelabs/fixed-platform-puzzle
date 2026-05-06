@@ -16,6 +16,7 @@ interface GameState {
   toggleAudio: () => void;
   setTutorialDone: (v: boolean) => void;
   resetProgress: () => void;
+  unlockAll: () => void;
 }
 
 const store = createStore<GameState>()(
@@ -38,6 +39,7 @@ const store = createStore<GameState>()(
       setTutorialDone: (v) => set({ tutorialDone: v }),
       resetProgress: () =>
         set({ currentLevel: 1, unlockedLevel: 1, movesThisLevel: 0, tutorialDone: false }),
+      unlockAll: () => set({ unlockedLevel: TOTAL_LEVELS }),
     }),
     {
       name: 'fpp-game-state-v2',

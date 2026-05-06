@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { SCENE_KEYS, TOTAL_LEVELS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { AudioManager } from '../managers/AudioManager';
+import { AdManager } from '../managers/AdManager';
 import { fadeIn, fadeOutAndStart } from '../utils/Effects';
 import {
   TOKENS,
@@ -33,6 +34,34 @@ export class LevelSelectScene extends Phaser.Scene {
       fadeOutAndStart(this, SCENE_KEYS.Menu);
     }, { w: 140, h: 100, fill: TOKENS.white, textSize: 46 });
     slideUpIn(this, back.container, 60, -20);
+
+    const allUnlocked = useGameStore.getState().unlockedLevel >= TOTAL_LEVELS;
+    if (!allUnlocked) {
+      const unlockBtn = neoButton(
+        this,
+        width - 260,
+        100,
+        420,
+        86,
+        'UNLOCK ALL (AD)',
+        TOKENS.yellow,
+        async () => {
+          AudioManager.uiTap();
+          unlockBtn.setEnabled(false);
+          unlockBtn.setLabel('LOADING...');
+          const ok = await AdManager.showRewarded('unlock_all');
+          if (ok) {
+            useGameStore.getState().unlockAll();
+            this.scene.restart();
+          } else {
+            unlockBtn.setEnabled(true);
+            unlockBtn.setLabel('UNLOCK ALL (AD)');
+          }
+        },
+        { textSize: 28 },
+      );
+      slideUpIn(this, unlockBtn.container, 100, -20);
+    }
 
     const header = this.add
       .text(width / 2 + 36, 100, 'SELECT LEVEL', {

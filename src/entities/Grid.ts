@@ -16,22 +16,33 @@ export class Grid {
   private createdObjects: Phaser.GameObjects.GameObject[] = [];
   private timers: Phaser.Time.TimerEvent[] = [];
 
-  constructor(scene: Phaser.Scene, cols: number, rows: number, exits: ExitZone[] = []) {
+  constructor(
+    scene: Phaser.Scene,
+    cols: number,
+    rows: number,
+    exits: ExitZone[] = [],
+    sizingDim?: { cols: number; rows: number },
+  ) {
     this.cols = cols;
     this.rows = rows;
     this.exits = exits;
 
+    // For sizing, use sizingDim (worst-case grid) if provided so cellSize is consistent
+    // across all levels. Falls back to actual cols/rows.
+    const sCols = sizingDim?.cols ?? cols;
+    const sRows = sizingDim?.rows ?? rows;
     const screenW = scene.scale.width;
     const screenH = scene.scale.height;
-    const maxByW = (screenW - 120) / cols;
-    // Reserved vertical: HUD top (126) + bottom UI band (240). Matches originY calc below.
-    const maxByH = (screenH - HUD_HEIGHT - 240) / rows;
+    const maxByW = (screenW - 120) / sCols;
+    // Reserved vertical: HUD top (HUD_HEIGHT) + bottom UI band (150). Bottom HUD buttons
+    // moved closer to the screen edge to free vertical room for bigger cells.
+    const maxByH = (screenH - HUD_HEIGHT - 150) / sRows;
     this.cellSize = Math.min(CELL_SIZE, maxByW, maxByH);
 
     const boardW = this.cellSize * cols;
     const boardH = this.cellSize * rows;
     this.originX = (screenW - boardW) / 2;
-    this.originY = HUD_HEIGHT + 40 + (screenH - HUD_HEIGHT - 40 - 240 - boardH) / 2;
+    this.originY = HUD_HEIGHT + 50 + (screenH - HUD_HEIGHT - 50 - 150 - boardH) / 2;
 
     this.occupancy = Array.from({ length: rows }, () => Array(cols).fill(null));
     this.drawBoard(scene);

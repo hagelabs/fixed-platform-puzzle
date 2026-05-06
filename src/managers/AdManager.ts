@@ -1,7 +1,7 @@
 import { SDKManager } from './SDKManager';
 import { Analytics } from './AnalyticsManager';
 
-export type AdPlacement = 'pre_level' | 'continue' | 'hint';
+export type AdPlacement = 'pre_level' | 'continue' | 'hint' | 'unlock_all';
 
 class AdManagerImpl {
   private levelStartCounter = 0;

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE_KEYS, HUD_HEIGHT, COLORS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
-import { getLevel } from '../config/Levels';
+import { getLevel, MAX_LEVEL_COLS, MAX_LEVEL_ROWS } from '../config/Levels';
 import { Grid } from '../entities/Grid';
 import { Block } from '../entities/Block';
 import { InputManager } from '../managers/InputManager';
@@ -69,7 +69,10 @@ export class GameScene extends Phaser.Scene {
     this.movement = new MovementSystem();
 
     const levelData = getLevel(store.currentLevel);
-    this.grid = new Grid(this, levelData.cols, levelData.rows, levelData.exits);
+    this.grid = new Grid(this, levelData.cols, levelData.rows, levelData.exits, {
+      cols: MAX_LEVEL_COLS,
+      rows: MAX_LEVEL_ROWS,
+    });
 
     this.blocks = [];
     this.input2 = new InputManager(this, (block, dir) => this.handleSwipe(block, dir));
@@ -137,7 +140,7 @@ export class GameScene extends Phaser.Scene {
       { w: 100, h: 86, fill: TOKENS.white, textSize: 32 },
     );
 
-    const bottomY = this.scale.height - 100;
+    const bottomY = this.scale.height - 55;
     this.undoBtn = neoButton(
       this,
       width / 2 - 300,

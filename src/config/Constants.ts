@@ -3,7 +3,7 @@ import { Color } from "../types/Game";
 export const GAME_WIDTH = 1920;
 export const GAME_HEIGHT = 1080;
 
-export const CELL_SIZE = 144;
+export const CELL_SIZE = 180;
 export const BOARD_PADDING = 32;
 
 export const HUD_HEIGHT = 126;

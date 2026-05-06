@@ -24,7 +24,8 @@ export class Grid {
     const screenW = scene.scale.width;
     const screenH = scene.scale.height;
     const maxByW = (screenW - 120) / cols;
-    const maxByH = (screenH - HUD_HEIGHT - 320) / rows;
+    // Reserved vertical: HUD top (126) + bottom UI band (240). Matches originY calc below.
+    const maxByH = (screenH - HUD_HEIGHT - 240) / rows;
     this.cellSize = Math.min(CELL_SIZE, maxByW, maxByH);
 
     const boardW = this.cellSize * cols;

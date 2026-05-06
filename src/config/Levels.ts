@@ -20,247 +20,310 @@ const L = (
   id: number, cols: number, rows: number, blocks: BlockData[], exits: ExitZone[],
 ): LevelData => ({ id, cols, rows, blocks, exits });
 
-// Each level hand-verified solvable. Solution sketch in comment.
-// Difficulty: order constraints + multiple wrong-start dead-ends force planning.
+// Hand-authored per LEVEL_DESIGN.md progression framework.
+// Phase 1 (1-5): Introduction. Phase 2 (6-10): Foundation.
+// Phase 3 (11-17): Advanced. Phase 4 (18-25): Expert.
 
 export const LEVELS: LevelData[] = [
-  // L1 — Quad Corner Pair (5x5, 6 moves)
-  // r1 LEFT exit; r3 UP→(0,0)→LEFT exit; r4 RIGHT exit; r2 DOWN→(4,4)→RIGHT exit.
-  // r3 cannot exit until r1 clears col 0 row 0 path; r2 needs r4 gone first.
-  L(1, 5, 5,
-    [S('a', 0, 0), S('b', 4, 0), S('c', 0, 4), S('d', 4, 4)],
-    [E('LEFT', 0), E('RIGHT', 4)],
-  ),
-
-  // L2 — Cross Around Obstacle (5x5, 8 moves)
-  // 4 sims around center obstacle; 4 corner exits.
-  // Each block: 2 swipes (slide to corner, then exit).
-  L(2, 5, 5,
-    [S('a', 2, 0), S('b', 2, 4), S('c', 0, 2), S('d', 4, 2), O('o', 2, 2)],
-    [E('TOP', 0), E('TOP', 4), E('BOTTOM', 0), E('BOTTOM', 4)],
-  ),
-
-  // L3 — Five Block Line (6x5, 5 moves order forced)
-  // Cols 0,1,2,3,5 in row 2. exit LEFT@2.
-  // Must remove leftmost first; trying any other first = blocked.
-  L(3, 6, 5,
-    [S('a', 0, 2), S('b', 1, 2), S('c', 2, 2), S('d', 3, 2), S('e', 5, 2)],
+  // L1 — First Touch (6x6, 1 move). Drag a left → exit.
+  L(1, 6, 6,
+    [S('a', 0, 2)],
     [E('LEFT', 2)],
   ),
 
-  // L4 — Yellow Stack (5x5, 3-5 moves)
-  // y constrained UP. s1, s2 in col 0 above y.
-  // s2 UP exit; s1 UP slides to (0,0) → exit; y UP exit.
-  L(4, 5, 5,
-    [C('y', 0, 4, 'UP'), S('s1', 0, 2), S('s2', 0, 0)],
-    [E('TOP', 0)],
+  // L2 — Two Sides (6x6, 2 moves). Each red at its exit edge.
+  L(2, 6, 6,
+    [S('a', 0, 1), S('b', 5, 4), O('o', 2, 2)],
+    [E('LEFT', 1), E('RIGHT', 4)],
   ),
 
-  // L5 — Yellow Through Three (6x5, 3-5 moves)
-  // y constrained RIGHT, blocked by s1, s2 chain.
-  // s2 RIGHT exit; s1 RIGHT exit; y RIGHT exit.
-  L(5, 6, 5,
-    [C('y', 0, 2, 'RIGHT'), S('s1', 2, 2), S('s2', 4, 2)],
-    [E('RIGHT', 2)],
+  // L3 — First Yellow (7x7, 2 moves). Red exits LEFT, yellow UP only.
+  // a (1,3) drag left→(0,3) LEFT@3. y (5,1) drag up→(5,0) TOP@5 (matches UP).
+  L(3, 7, 7,
+    [S('a', 1, 3), C('y', 5, 1, 'UP'), O('o', 3, 5)],
+    [E('LEFT', 3), E('TOP', 5)],
   ),
 
-  // L6 — Stopper Trick (5x5, 4 moves order critical)
-  // r1 must use r2 as stopper to halt at (1,4) before exit BOTTOM@1.
-  // If r2 exits first, r1 slides past col 1 → unsolvable.
-  // r1 DOWN→(0,4). r1 RIGHT→(1,4) (blocked by r2). r1 DOWN exit. r2 RIGHT exit.
-  L(6, 5, 5,
-    [S('a', 0, 2), S('b', 2, 4)],
-    [E('BOTTOM', 1), E('RIGHT', 4)],
+  // L4 — Unlock the Blue (7x7, 2 moves). Depth 1.
+  // r left→LEFT@3. b unlocked, drag right→(6,3) RIGHT@3.
+  L(4, 7, 7,
+    [S('r', 1, 3), D('b', 5, 3, 'r'), O('o', 3, 5)],
+    [E('LEFT', 3), E('RIGHT', 3)],
   ),
 
-  // L7 — Yellow Pair w/ Stoppers (6x5, 6 moves)
-  // y1, y2 each constrained RIGHT, each blocked by simple stopper in their row.
-  // s1 RIGHT exit; y1 RIGHT exit. s2 RIGHT exit; y2 RIGHT exit.
-  L(7, 6, 5,
+  // L5 — Mixed Quartet (7x7, 4 moves). Depth 1.
+  // r1 left→LEFT@1. b unlock→right→RIGHT@1.
+  // r2 right→RIGHT@5. y right→(6,5) RIGHT@5 (matches RIGHT).
+  L(5, 7, 7,
     [
-      C('y1', 0, 1, 'RIGHT'), C('y2', 0, 3, 'RIGHT'),
-      S('s1', 3, 1), S('s2', 3, 3),
+      S('r1', 1, 1), S('r2', 5, 5),
+      C('y', 0, 5, 'RIGHT'),
+      D('b', 6, 1, 'r1'),
+      O('o1', 3, 3), O('o2', 4, 3),
     ],
-    [E('RIGHT', 1), E('RIGHT', 3)],
+    [E('LEFT', 1), E('RIGHT', 1), E('LEFT', 5), E('RIGHT', 5)],
   ),
 
-  // L8 — Solo Spiral Detour (6x6, 4-5 moves)
-  // r needs RIGHT@0; obstacle at (0,2) blocks straight UP; o(2,4) decoration.
-  // r UP→(0,3) blocked. r RIGHT→(5,3). r UP→(5,0). r RIGHT exit RIGHT@0.
-  L(8, 6, 6,
-    [S('a', 0, 5), O('o1', 0, 2), O('o2', 2, 4)],
-    [E('RIGHT', 0)],
-  ),
-
-  // L9 — Hub Pinned (5x5, 3 moves)
-  // r blocked LEFT/RIGHT by deps. r UP exits TOP@2; b1 LEFT, b2 RIGHT.
-  L(9, 5, 5,
-    [S('r', 2, 2), D('b1', 0, 2, 'r'), D('b2', 4, 2, 'r')],
-    [E('TOP', 2), E('LEFT', 2), E('RIGHT', 2)],
-  ),
-
-  // L10 — Yellow Pin Trio (5x5, 5 moves order required)
-  // y constrained UP, blocked by s1; s1 blocked by s2.
-  // s2 UP exit; s1 UP exit; y UP exit. Plus s3 separate.
-  L(10, 5, 5,
+  // L6 — Four-Way (8x8, 4 moves). Depth 1.
+  // r1 left→LEFT@1. r2 right→RIGHT@6.
+  // y down col 3→BOTTOM@3 (matches DOWN). b unlock→up col 4→TOP@4.
+  L(6, 8, 8,
     [
-      C('y', 2, 4, 'UP'), S('s1', 2, 2), S('s2', 2, 0),
-      S('s3', 0, 0),
+      S('r1', 1, 1), S('r2', 6, 6),
+      C('y', 3, 0, 'DOWN'),
+      D('b', 4, 7, 'y'),
+      O('o1', 2, 4), O('o2', 5, 4),
     ],
-    [E('TOP', 0), E('TOP', 2)],
+    [E('LEFT', 1), E('RIGHT', 6), E('BOTTOM', 3), E('TOP', 4)],
   ),
 
-  // L11 — Quad Diagonal w/ Obstacles (6x6, 4-6 moves)
-  // r1 UP exit; r2 LEFT row 0→(0,0)→UP exit; r4 DOWN exit; r3 UP→(0,0) (after others)→UP exit.
-  // Order: r1, r2, r4, r3 (or some equivalent).
-  L(11, 6, 6,
+  // L7 — Yellow Pair w/ Stoppers (8x8, 4 moves).
+  // r1 right→(7,2) RIGHT@2 (clears row 2). y1 right→(7,2) RIGHT@2 (matches).
+  // r2 right→(7,5) RIGHT@5. y2 right→(7,5) RIGHT@5.
+  L(7, 8, 8,
     [
-      S('a', 0, 0), S('b', 5, 0), S('c', 0, 5), S('d', 5, 5),
-      O('o1', 2, 2), O('o2', 3, 3),
+      C('y1', 0, 2, 'RIGHT'), C('y2', 0, 5, 'RIGHT'),
+      S('r1', 4, 2), S('r2', 4, 5),
+      O('o1', 6, 0), O('o2', 6, 7),
     ],
-    [E('TOP', 0), E('BOTTOM', 5)],
+    [E('RIGHT', 2), E('RIGHT', 5)],
   ),
 
-  // L12 — Chain w/ Lateral Stop (6x5, 4 moves)
-  // r LEFT exit; s LEFT exit; b1 LEFT exit; b2 LEFT exit.
-  // Forced sequence by dependency chain.
-  L(12, 6, 5,
-    [S('r', 0, 2), S('s', 2, 2), D('b1', 4, 2, 's'), D('b2', 5, 2, 'b1')],
-    [E('LEFT', 2), E('RIGHT', 2)],
-  ),
-
-  // L13 — Yellow Cross Bridge (6x6, 6 moves)
-  // y1 row 2 RIGHT clear (no obstacles row 2). y1 exits RIGHT@2.
-  // y2 row 3 LEFT clear. y2 exits LEFT@3.
-  // s1, s2 in row 4 must exit via BOTTOM corners.
-  L(13, 6, 6,
+  // L8 — Cross Currents (8x8, 5 moves). Depth 1 + parallel yellows.
+  // r1 left→LEFT@1. r2 right→RIGHT@6. b unlock→up col 4→TOP@4.
+  // y1 right row 4→RIGHT@4. y2 left row 3→LEFT@3.
+  L(8, 8, 8,
     [
-      C('y1', 0, 2, 'RIGHT'), C('y2', 5, 3, 'LEFT'),
-      S('s1', 0, 4), S('s2', 5, 4),
+      S('r1', 1, 1), S('r2', 6, 6),
+      C('y1', 0, 4, 'RIGHT'), C('y2', 7, 3, 'LEFT'),
+      D('b', 4, 4, 'r1'),
+      O('o1', 2, 2), O('o2', 5, 5), O('o3', 4, 7),
     ],
-    [E('RIGHT', 2), E('LEFT', 3), E('BOTTOM', 0), E('BOTTOM', 5)],
+    [E('LEFT', 1), E('RIGHT', 6), E('RIGHT', 4), E('LEFT', 3), E('TOP', 4)],
   ),
 
-  // L14 — 4-Dep Diagonal (5x5, 5 moves)
-  // r at center, deps at corners (don't pin). r exits any direction; deps follow.
-  // r UP→(2,0)→exit TOP@2. b1(0,0) RIGHT→(4,0)→DOWN→(4,4) blocked? b4. or simpler.
-  // b's at corners need to reach row/col 2.
-  L(14, 5, 5,
+  // L9 — Order Trap (8x8, 4 moves). False path: drag y first → blocked by r3.
+  // r1 left→LEFT@2. r2 right→RIGHT@2. r3 left→LEFT@5.
+  // y left row 5 (after r3 gone)→LEFT@5 (matches LEFT).
+  L(9, 8, 8,
     [
-      S('r', 2, 2),
-      D('b1', 0, 0, 'r'), D('b4', 4, 4, 'r'),
+      S('r1', 0, 2), S('r2', 7, 2), S('r3', 0, 5),
+      C('y', 7, 5, 'LEFT'),
+      O('o1', 3, 3), O('o2', 4, 4), O('o3', 3, 0),
     ],
-    [E('TOP', 2), E('BOTTOM', 2), E('LEFT', 2), E('RIGHT', 2)],
+    [E('LEFT', 2), E('RIGHT', 2), E('LEFT', 5)],
   ),
 
-  // L15 — Constrained Corridor (7x5, 7 moves order)
-  // y, s1, s2, s3 all in row 2 single exit RIGHT@2.
-  // Reverse order required: s3 first then s2, s1, y.
-  L(15, 7, 5,
+  // L10 — Twin Chain (8x8, 6 moves). Depth 2.
+  // r1 left→LEFT@1. b1 unlock→up→TOP@4. b2 unlock→down→BOTTOM@4.
+  // r2 right→RIGHT@6. y1 right row 4→RIGHT@4. y2 left row 3→LEFT@3.
+  L(10, 8, 8,
     [
-      C('y', 0, 2, 'RIGHT'),
-      S('a', 2, 2), S('b', 4, 2), S('c', 6, 2),
+      S('r1', 1, 1), S('r2', 6, 6),
+      C('y1', 0, 4, 'RIGHT'), C('y2', 7, 3, 'LEFT'),
+      D('b1', 4, 1, 'r1'), D('b2', 4, 6, 'b1'),
+      O('o1', 2, 5), O('o2', 5, 2), O('o3', 3, 5),
     ],
-    [E('RIGHT', 2)],
+    [E('LEFT', 1), E('RIGHT', 6), E('RIGHT', 4), E('LEFT', 3), E('TOP', 4), E('BOTTOM', 4)],
   ),
 
-  // L16 — Detour + Stopper (5x5, 5 moves)
-  // r needs BOTTOM@1; uses s as stopper at (1,4).
-  L(16, 5, 5,
-    [S('r', 0, 0), S('s', 2, 4), O('o1', 2, 2), O('o2', 4, 2)],
-    [E('BOTTOM', 1), E('RIGHT', 4)],
-  ),
-
-  // L17 — Mixed Mechanic Tier (6x6, 5 moves)
-  // y RIGHT exit, r LEFT exit, b unlocks LEFT exit.
-  L(17, 6, 6,
+  // L11 — Parallel Chains (9x9, 6 moves).
+  // r1 left→LEFT@1. b1→LEFT@7. r2 right→RIGHT@7. b2→RIGHT@1.
+  // y1 right row 3→RIGHT@3. y2 left row 5→LEFT@5.
+  L(11, 9, 9,
     [
-      C('y', 0, 0, 'RIGHT'), S('r', 0, 5),
-      D('b', 5, 5, 'r'),
+      S('r1', 0, 1), S('r2', 8, 7),
+      D('b1', 0, 7, 'r1'), D('b2', 8, 1, 'r2'),
+      C('y1', 0, 3, 'RIGHT'), C('y2', 8, 5, 'LEFT'),
+      O('o1', 4, 4), O('o2', 4, 0), O('o3', 4, 8), O('o4', 2, 7),
     ],
-    [E('RIGHT', 0), E('LEFT', 5)],
+    [E('LEFT', 1), E('LEFT', 7), E('RIGHT', 7), E('RIGHT', 1), E('RIGHT', 3), E('LEFT', 5)],
   ),
 
-  // L18 — Long Line + Sealed Right (7x5, 4 moves)
-  // 4 sims row 2 cols 0,2,4,6. exit LEFT@2 only.
-  L(18, 7, 5,
-    [S('a', 0, 2), S('b', 2, 2), S('c', 4, 2), S('d', 6, 2)],
-    [E('LEFT', 2)],
-  ),
-
-  // L19 — Yellow + Linear Chain (6x5, 5 moves)
-  // y exit row 2 RIGHT; b1 unlocks; b2 unlocks; b3 unlocks. Chain in row 3.
-  L(19, 6, 5,
+  // L12 — Cross Center (9x9, 5 moves). Depth 1 + 2 yellows.
+  // r1 left→LEFT@4. r2 right→RIGHT@4. b unlock→up col 4→TOP@4.
+  // y1 down col 3→BOTTOM@3. y2 up col 5→TOP@5.
+  L(12, 9, 9,
     [
-      C('y', 0, 2, 'RIGHT'),
-      S('s', 0, 3), D('b1', 3, 3, 's'), D('b2', 5, 3, 'b1'),
+      S('r1', 0, 4), S('r2', 8, 4),
+      C('y1', 3, 0, 'DOWN'), C('y2', 5, 8, 'UP'),
+      D('b', 4, 4, 'r1'),
+      O('o1', 2, 2), O('o2', 6, 6), O('o3', 1, 7),
     ],
-    [E('RIGHT', 2), E('LEFT', 3), E('RIGHT', 3)],
+    [E('LEFT', 4), E('RIGHT', 4), E('BOTTOM', 3), E('TOP', 5), E('TOP', 4)],
   ),
 
-  // L20 — Yellow Convergence (7x6, 5 moves)
-  // y1 RIGHT row 2 clear (no row 2 obstacle); y2 LEFT row 4 clear.
-  // b1 dep y1, b2 dep y2.
-  L(20, 7, 6,
+  // L13 — Three Reds w/ Yellows (9x9, 6 moves). Depth 1.
+  // r1,r2 left exits. r3 right→RIGHT@4. b unlock→left→LEFT@4.
+  // y1 down col 3→BOTTOM@3. y2 up col 5→TOP@5.
+  L(13, 9, 9,
     [
-      C('y1', 0, 2, 'RIGHT'), C('y2', 6, 4, 'LEFT'),
-      S('a', 3, 1), S('b', 3, 5),
+      S('r1', 0, 1), S('r2', 0, 7), S('r3', 8, 4),
+      C('y1', 3, 0, 'DOWN'), C('y2', 5, 8, 'UP'),
+      D('b', 4, 4, 'r3'),
+      O('o1', 2, 2), O('o2', 2, 6), O('o3', 6, 2), O('o4', 6, 6),
     ],
-    [E('RIGHT', 2), E('LEFT', 4), E('TOP', 3), E('BOTTOM', 3)],
+    [E('LEFT', 1), E('LEFT', 7), E('RIGHT', 4), E('BOTTOM', 3), E('TOP', 5), E('LEFT', 4)],
   ),
 
-  // L21 — Branching Deps (6x6, 5 moves)
-  // r exits → 2 children unlock → each unlocks own grandchild.
-  L(21, 6, 6,
+  // L14 — All Yellow (9x9, 4 moves). No deps.
+  // r down col 4→BOTTOM@4 (clears way). y3 down col 4→BOTTOM@4 (matches).
+  // y1 right row 2→RIGHT@2. y2 left row 6→LEFT@6.
+  L(14, 9, 9,
     [
-      S('r', 0, 0),
-      D('b1', 5, 0, 'r'), D('b2', 0, 5, 'r'),
-      D('c1', 5, 5, 'b1'),
+      S('r', 4, 4),
+      C('y1', 0, 2, 'RIGHT'), C('y2', 8, 6, 'LEFT'), C('y3', 4, 0, 'DOWN'),
+      O('o1', 2, 5), O('o2', 6, 3), O('o3', 1, 7),
     ],
-    [E('TOP', 0), E('TOP', 5), E('BOTTOM', 0), E('BOTTOM', 5)],
+    [E('RIGHT', 2), E('LEFT', 6), E('BOTTOM', 4)],
   ),
 
-  // L22 — 4-Block Quartet w/ Sealed Center (6x6, 6 moves)
-  L(22, 6, 6,
+  // L15 — Edge Chain (9x9, 6 moves). Depth 2.
+  // r1 left→LEFT@1. b1 unlock→up→TOP@4. b2 unlock→down→BOTTOM@4.
+  // r2 right→RIGHT@7. y1 right row 3→RIGHT@3. y2 left row 5→LEFT@5.
+  L(15, 9, 9,
     [
-      S('a', 0, 2), S('b', 5, 2),
-      S('c', 0, 3), S('d', 5, 3),
+      S('r1', 0, 1), S('r2', 8, 7),
+      C('y1', 0, 3, 'RIGHT'), C('y2', 8, 5, 'LEFT'),
+      D('b1', 4, 0, 'r1'), D('b2', 4, 8, 'b1'),
+      O('o1', 2, 6), O('o2', 6, 2), O('o3', 4, 4), O('o4', 7, 6),
     ],
-    [E('LEFT', 2), E('RIGHT', 2), E('LEFT', 3), E('RIGHT', 3)],
+    [E('LEFT', 1), E('RIGHT', 7), E('RIGHT', 3), E('LEFT', 5), E('TOP', 4), E('BOTTOM', 4)],
   ),
 
-  // L23 — Yellow + Pair Stoppers (7x6, 6 moves)
-  // y constrained RIGHT; s1, s2 are stoppers; obstacles seal rows.
-  L(23, 7, 6,
+  // L16 — False Lure (9x9, 5 moves). False: drag y first → blocked.
+  // r1 left→LEFT@1. b unlock→left row 4→LEFT@4. r2 right→RIGHT@7.
+  // y1 right row 5→RIGHT@5. y2 left row 3→LEFT@3.
+  L(16, 9, 9,
     [
-      C('y', 0, 2, 'RIGHT'), S('s1', 3, 2), S('s2', 6, 2),
-      O('o1', 1, 4), O('o2', 5, 4),
+      S('r1', 1, 1), S('r2', 7, 7),
+      C('y1', 0, 5, 'RIGHT'), C('y2', 8, 3, 'LEFT'),
+      D('b', 4, 4, 'r1'),
+      O('o1', 3, 2), O('o2', 5, 6), O('o3', 4, 0), O('o4', 4, 8),
     ],
-    [E('RIGHT', 2), E('BOTTOM', 3)],
+    [E('LEFT', 1), E('RIGHT', 7), E('RIGHT', 5), E('LEFT', 3), E('LEFT', 4)],
   ),
 
-  // L24 — Mixed Net (6x6, 6 moves)
-  // 2 sims unlock 2 deps; 2 yellows independent.
-  L(24, 6, 6,
+  // L17 — Wide Court (10x9, 7 moves).
+  // r1 left→LEFT@1. b1→LEFT@7. r2 right→RIGHT@7. b2→RIGHT@1.
+  // r3 up→TOP@4 (already at edge). y1 right row 3→RIGHT@3. y2 left row 5→LEFT@5.
+  L(17, 10, 9,
     [
-      S('r1', 0, 0), C('y', 5, 0, 'LEFT'),
-      D('b1', 2, 2, 'r1'), D('b2', 5, 5, 'r1'),
-      O('o', 3, 3),
+      S('r1', 0, 1), S('r2', 9, 7), S('r3', 4, 0),
+      C('y1', 0, 3, 'RIGHT'), C('y2', 9, 5, 'LEFT'),
+      D('b1', 0, 7, 'r1'), D('b2', 9, 1, 'r2'),
+      O('o1', 3, 4), O('o2', 6, 4), O('o3', 4, 8), O('o4', 5, 8), O('o5', 4, 2),
     ],
-    [E('TOP', 0), E('LEFT', 0), E('LEFT', 2), E('RIGHT', 5)],
+    [E('LEFT', 1), E('RIGHT', 7), E('TOP', 4), E('LEFT', 7), E('RIGHT', 1), E('RIGHT', 3), E('LEFT', 5)],
   ),
 
-  // L25 — Master Final (7x7, 8+ moves)
-  // r LEFT exit. s DOWN exit. y constrained DOWN exit. b unlocks UP exit.
-  // Decoration obstacles.
-  L(25, 7, 7,
+  // L18 — Triple Chain (10x9, 5 moves). Depth 3.
+  // r left→LEFT@4. b1→right RIGHT@4. b2→up TOP@9. b3→up TOP@0.
+  // y up col 4→TOP@4 (matches UP).
+  L(18, 10, 9,
     [
-      S('r', 0, 3), S('s', 3, 5),
-      C('y', 3, 3, 'DOWN'), D('b', 3, 0, 'y'),
-      O('o1', 2, 4), O('o2', 4, 4),
-      O('o3', 1, 6), O('o4', 5, 6),
+      S('r', 0, 4),
+      D('b1', 9, 4, 'r'), D('b2', 9, 0, 'b1'), D('b3', 0, 0, 'b2'),
+      C('y', 4, 8, 'UP'),
+      O('o1', 5, 5), O('o2', 3, 4), O('o3', 6, 6),
     ],
-    [E('LEFT', 3), E('BOTTOM', 3), E('TOP', 3)],
+    [E('LEFT', 4), E('RIGHT', 4), E('TOP', 9), E('TOP', 0), E('TOP', 4)],
+  ),
+
+  // L19 — Big Yard (10x10, 7 moves). Parallel chains + yellows.
+  // r1 left→LEFT@1. b1→LEFT@8. r2 right→RIGHT@8. b2→RIGHT@1.
+  // r3 right row 4→RIGHT@4. y1 down col 4→BOTTOM@4. y2 up col 5→TOP@5.
+  L(19, 10, 10,
+    [
+      S('r1', 0, 1), S('r2', 9, 8),
+      D('b1', 0, 8, 'r1'), D('b2', 9, 1, 'r2'),
+      C('y1', 4, 0, 'DOWN'), C('y2', 5, 9, 'UP'),
+      S('r3', 4, 4),
+      O('o1', 2, 4), O('o2', 7, 5), O('o3', 6, 2), O('o4', 3, 7),
+    ],
+    [E('LEFT', 1), E('RIGHT', 8), E('LEFT', 8), E('RIGHT', 1), E('BOTTOM', 4), E('TOP', 5), E('RIGHT', 4)],
+  ),
+
+  // L20 — Pinwheel (10x10, 8 moves).
+  // r1 up→TOP@0. b1→up TOP@9. r2 down→BOTTOM@9. b2→down BOTTOM@0.
+  // y2 left row 4→LEFT@4. r3 right row 4→RIGHT@4.
+  // r4 right row 5→RIGHT@5. y1 right row 5→RIGHT@5.
+  L(20, 10, 10,
+    [
+      S('r1', 0, 0), S('r2', 9, 9),
+      D('b1', 9, 0, 'r1'), D('b2', 0, 9, 'r2'),
+      C('y1', 0, 5, 'RIGHT'), C('y2', 9, 4, 'LEFT'),
+      S('r3', 4, 4), S('r4', 5, 5),
+      O('o1', 2, 2), O('o2', 7, 7), O('o3', 4, 7), O('o4', 5, 2),
+    ],
+    [E('TOP', 0), E('BOTTOM', 9), E('TOP', 9), E('BOTTOM', 0), E('RIGHT', 5), E('LEFT', 4), E('RIGHT', 4)],
+  ),
+
+  // L21 — Branching Tree (10x10, 7 moves). r unlocks b1 and b2 (parallel).
+  // r1 up. b1→right row 4→RIGHT@4. r2 down. b2→up unchanged path.
+  // r3 down→BOTTOM@0. y1 right row 4→RIGHT@4 (after b1). y2 left row 5→LEFT@5.
+  L(21, 10, 10,
+    [
+      S('r1', 0, 0), S('r2', 9, 9), S('r3', 0, 9),
+      D('b1', 9, 0, 'r1'), D('b2', 4, 4, 'r2'),
+      C('y1', 0, 4, 'RIGHT'), C('y2', 9, 5, 'LEFT'),
+      O('o1', 3, 3), O('o2', 6, 6), O('o3', 5, 2), O('o4', 4, 7), O('o5', 2, 7),
+    ],
+    [E('TOP', 0), E('BOTTOM', 9), E('BOTTOM', 0), E('TOP', 9), E('RIGHT', 4), E('LEFT', 5)],
+  ),
+
+  // L22 — Eight Block Arena (10x10, 8 moves). Mixed.
+  // r1 left→LEFT@1. b1→LEFT@8. r2 right→RIGHT@8. b2→RIGHT@1.
+  // r3 up→TOP@4. r4 down→BOTTOM@5. y1 right row 5→RIGHT@5. y2 left row 4→LEFT@4.
+  L(22, 10, 10,
+    [
+      S('r1', 0, 1), S('r2', 9, 8), S('r3', 4, 0), S('r4', 5, 9),
+      D('b1', 0, 8, 'r1'), D('b2', 9, 1, 'r2'),
+      C('y1', 0, 5, 'RIGHT'), C('y2', 9, 4, 'LEFT'),
+      O('o1', 3, 3), O('o2', 6, 6), O('o3', 5, 3), O('o4', 4, 6), O('o5', 2, 7), O('o6', 7, 2),
+    ],
+    [E('LEFT', 1), E('RIGHT', 8), E('LEFT', 8), E('RIGHT', 1), E('TOP', 4), E('BOTTOM', 5), E('RIGHT', 5), E('LEFT', 4)],
+  ),
+
+  // L23 — Center Web (10x10, 8 moves). 4 corners + 3 deps + yellow.
+  // r1,r2,r3,r4 each at corner→edge exit.
+  // b1→left LEFT@4. b2→right RIGHT@5. b3→left LEFT@5. y up col 5→TOP@5.
+  L(23, 10, 10,
+    [
+      S('r1', 0, 0), S('r2', 9, 0), S('r3', 0, 9), S('r4', 9, 9),
+      D('b1', 4, 4, 'r1'), D('b2', 5, 5, 'r2'), D('b3', 4, 5, 'r3'),
+      C('y', 5, 4, 'UP'),
+      O('o1', 3, 3), O('o2', 6, 6), O('o3', 6, 3), O('o4', 3, 6), O('o5', 7, 4), O('o6', 1, 6),
+    ],
+    [E('TOP', 0), E('TOP', 9), E('BOTTOM', 0), E('BOTTOM', 9), E('LEFT', 4), E('RIGHT', 5), E('LEFT', 5), E('TOP', 5)],
+  ),
+
+  // L24 — Endgame Symmetry (9x9, 5 moves). Elegant balance.
+  // r left row 4→LEFT@4. b1 unlock→up→TOP@4. b2 unlock→down→BOTTOM@4.
+  // y1 right row 3→RIGHT@3. y2 left row 5→LEFT@5.
+  L(24, 9, 9,
+    [
+      S('r', 4, 4),
+      C('y1', 0, 3, 'RIGHT'), C('y2', 8, 5, 'LEFT'),
+      D('b1', 4, 0, 'r'), D('b2', 4, 8, 'r'),
+      O('o1', 2, 2), O('o2', 6, 6), O('o3', 2, 6), O('o4', 6, 2),
+    ],
+    [E('TOP', 4), E('BOTTOM', 4), E('RIGHT', 3), E('LEFT', 5), E('LEFT', 4)],
+  ),
+
+  // L25 — Master Final (9x9, 7 moves).
+  // r1 up→TOP@0. b1 unlock→up TOP@8. r2 down→BOTTOM@8. b2 unlock→down BOTTOM@0.
+  // s down col 4→BOTTOM@4. y1 down col 3→BOTTOM@3 (matches DOWN).
+  // y2 up col 5→TOP@5 (matches UP).
+  L(25, 9, 9,
+    [
+      S('r1', 0, 0), S('r2', 8, 8),
+      D('b1', 8, 0, 'r1'), D('b2', 0, 8, 'r2'),
+      C('y1', 3, 0, 'DOWN'), C('y2', 5, 8, 'UP'),
+      S('s', 4, 4),
+      O('o1', 2, 2), O('o2', 6, 6), O('o3', 2, 6), O('o4', 6, 2), O('o5', 1, 4), O('o6', 7, 4),
+    ],
+    [E('TOP', 0), E('TOP', 8), E('BOTTOM', 0), E('BOTTOM', 8), E('BOTTOM', 4), E('BOTTOM', 3), E('TOP', 5)],
   ),
 ];
 

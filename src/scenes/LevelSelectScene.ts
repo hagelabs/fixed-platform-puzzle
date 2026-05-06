@@ -3,6 +3,7 @@ import { SCENE_KEYS, TOTAL_LEVELS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { AudioManager } from '../managers/AudioManager';
 import { AdManager } from '../managers/AdManager';
+import { SDKManager } from '../managers/SDKManager';
 import { fadeIn, fadeOutAndStart } from '../utils/Effects';
 import {
   TOKENS,
@@ -37,7 +38,7 @@ export class LevelSelectScene extends Phaser.Scene {
     slideUpIn(this, back.container, 60, -20);
 
     const allUnlocked = useGameStore.getState().unlockedLevel >= TOTAL_LEVELS;
-    if (!allUnlocked) {
+    if (!allUnlocked && SDKManager.hasRewardedAds()) {
       const unlockBtn = neoButton(
         this,
         width - 260,

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE_KEYS, HUD_HEIGHT, COLORS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
-import { getLevel, MAX_LEVEL_COLS, MAX_LEVEL_ROWS } from '../config/Levels';
+import { getLevel, getSolution, MAX_LEVEL_COLS, MAX_LEVEL_ROWS, SolutionMove } from '../config/Levels';
 import { Grid } from '../entities/Grid';
 import { Block } from '../entities/Block';
 import { InputManager } from '../managers/InputManager';
@@ -39,11 +39,15 @@ export class GameScene extends Phaser.Scene {
   private movesText!: Phaser.GameObjects.Text;
   private hintBtn!: NeoButtonHandle;
   private undoBtn!: NeoButtonHandle;
+  private watchBtn!: NeoButtonHandle;
+  private watchLabel!: Phaser.GameObjects.Text;
   private deadEndShown = false;
 
   private hintBusy = false;
   private hovered: Block | null = null;
   private busy = false;
+  private watchPlaying = false;
+  private autoplayActive = false;
 
   constructor() {
     super({ key: SCENE_KEYS.Game });
@@ -93,6 +97,11 @@ export class GameScene extends Phaser.Scene {
       this.events.off('block:settled', this.refreshHover, this);
       this.hovered = null;
     });
+
+    if (this.registry.get('autoplaySolution')) {
+      this.registry.remove('autoplaySolution');
+      this.time.delayedCall(400, () => this.runAutoplay());
+    }
   }
 
   private refreshHover(): void {
@@ -141,39 +150,146 @@ export class GameScene extends Phaser.Scene {
     );
 
     const bottomY = this.scale.height - 55;
+    const btnW = 210;
+    const btnSpacing = 230;
     this.undoBtn = neoButton(
       this,
-      width / 2 - 300,
+      width / 2 - btnSpacing * 1.5,
       bottomY,
-      200,
+      btnW,
       86,
       'UNDO',
       TOKENS.yellow,
       () => this.undo(),
-      { textSize: 36 },
+      { textSize: 32 },
     );
     this.hintBtn = neoButton(
       this,
-      width / 2,
+      width / 2 - btnSpacing * 0.5,
       bottomY,
-      200,
+      btnW,
       86,
       'HINT',
       TOKENS.sky,
       () => this.requestHint(),
-      { textSize: 36 },
+      { textSize: 32 },
     );
+    this.watchBtn = neoButton(
+      this,
+      width / 2 + btnSpacing * 0.5,
+      bottomY,
+      btnW,
+      86,
+      'WATCH',
+      TOKENS.mint,
+      () => this.requestWatch(),
+      { textSize: 30 },
+    );
+    this.watchLabel = this.add
+      .text(width / 2 + btnSpacing * 0.5, bottomY + 56, '', {
+        fontFamily: FONT_NEO,
+        fontSize: '20px',
+        color: TOKENS.inkHex,
+      })
+      .setOrigin(0.5);
+    this.refreshWatchLabel();
+    this.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => this.refreshWatchLabel(),
+    });
     neoButton(
       this,
-      width / 2 + 300,
+      width / 2 + btnSpacing * 1.5,
       bottomY,
-      200,
+      btnW,
       86,
       'RESTART',
       TOKENS.danger,
       () => this.scene.restart(),
-      { textSize: 36 },
+      { textSize: 32 },
     );
+  }
+
+  private refreshWatchLabel(): void {
+    const store = useGameStore.getState();
+    const credits = store.getWatchCredits();
+    const sec = store.getWatchResetSecondsLeft();
+    if (credits > 0) {
+      this.watchLabel.setText(`${credits}/5 LEFT`);
+    } else {
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      this.watchLabel.setText(`RESET ${m}:${String(s).padStart(2, '0')}`);
+    }
+    this.watchBtn.setEnabled(credits > 0 && !this.watchPlaying);
+  }
+
+  private async requestWatch(): Promise<void> {
+    if (this.watchPlaying || this.busy) return;
+    const store = useGameStore.getState();
+    if (store.getWatchCredits() <= 0) {
+      AudioManager.thud();
+      this.refreshWatchLabel();
+      return;
+    }
+    if (!store.consumeWatch()) {
+      AudioManager.thud();
+      this.refreshWatchLabel();
+      return;
+    }
+    AudioManager.uiTap();
+    Analytics.log('hint_used', { type: 'watch_solution' });
+    this.refreshWatchLabel();
+
+    this.registry.set('autoplaySolution', true);
+    this.scene.restart();
+  }
+
+  private async runAutoplay(): Promise<void> {
+    const store = useGameStore.getState();
+    const moves: SolutionMove[] = getSolution(store.currentLevel);
+    if (moves.length === 0) {
+      this.watchPlaying = false;
+      this.refreshWatchLabel();
+      return;
+    }
+    this.watchPlaying = true;
+    this.undoBtn.setEnabled(false);
+    this.hintBtn.setEnabled(false);
+    this.watchBtn.setEnabled(false);
+    this.refreshWatchLabel();
+
+    for (const mv of moves) {
+      // wait for any in-flight animation
+      await this.waitUntilIdle();
+      const block = this.blocks.find((b) => b.blockId === mv.blockId);
+      if (!block || block.removed) continue;
+      this.autoplayActive = true;
+      this.handleSwipe(block, mv.dir);
+      this.autoplayActive = false;
+      // small visual gap between moves
+      await this.delay(120);
+    }
+    await this.waitUntilIdle();
+    this.watchPlaying = false;
+    this.undoBtn.setEnabled(true);
+    this.hintBtn.setEnabled(true);
+    this.refreshWatchLabel();
+  }
+
+  private waitUntilIdle(): Promise<void> {
+    return new Promise((resolve) => {
+      const tick = () => {
+        if (!this.busy) resolve();
+        else this.time.delayedCall(40, tick);
+      };
+      tick();
+    });
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => this.time.delayedCall(ms, () => resolve()));
   }
 
   private drawHudLabel(
@@ -273,6 +389,7 @@ export class GameScene extends Phaser.Scene {
 
   private handleSwipe(block: Block, dir: Direction): void {
     if (this.busy) return;
+    if (this.watchPlaying && !this.autoplayActive) return;
     if (block.removed || block.type === 'obstacle') return;
 
     const result = this.movement.slide(block, this.grid, dir, this.blocks);

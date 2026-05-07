@@ -3,7 +3,8 @@ import { SCENE_KEYS, TOTAL_LEVELS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { AdManager } from '../managers/AdManager';
 import { confetti, fadeIn, fadeOutAndStart } from '../utils/Effects';
-import { TOKENS, FONT_NEO, neoButton, dottedBackground } from '../ui/Theme';
+import { TOKENS, FONT_NEO, neoButton, dottedBackground, popIn, slideUpIn } from '../ui/Theme';
+import { getRandomQuote } from '../config/Quotes';
 
 interface GameOverData {
   result: 'WIN' | 'STUCK';
@@ -17,16 +18,138 @@ export class GameOverScene extends Phaser.Scene {
   create(data: GameOverData): void {
     fadeIn(this);
     dottedBackground(this);
-    const { width, height } = this.scale;
+    const { width } = this.scale;
     const cx = width / 2;
-    const cy = height / 2;
     const win = data.result === 'WIN';
+
+    if (win) {
+      confetti(this);
+      this.layoutWin();
+    } else {
+      this.layoutStuck(cx);
+    }
+  }
+
+  private layoutWin(): void {
+    const { width } = this.scale;
+    const cx = width / 2;
+    const store = useGameStore.getState();
+    const isLast = store.currentLevel >= TOTAL_LEVELS;
+
+    const headTxt = this.add
+      .text(cx, 180, 'CLEARED!', {
+        fontFamily: FONT_NEO,
+        fontSize: '94px',
+        color: TOKENS.inkHex,
+      })
+      .setOrigin(0.5);
+    popIn(this, headTxt, 0);
+
+    const subTxt = this.add
+      .text(cx, 282, `LEVEL ${store.currentLevel} · ${store.movesThisLevel} MOVES`, {
+        fontFamily: FONT_NEO,
+        fontSize: '32px',
+        color: TOKENS.inkHex,
+      })
+      .setOrigin(0.5);
+    this.fadeTextIn(subTxt, 140, 0.7);
+
+    this.drawQuotePanel(560, 680, 820, 460);
+
+    const btnX = 1340;
+    const btnW = 460;
+    const btnH = 120;
+
+    if (isLast) {
+      const doneTxt = this.add
+        .text(btnX, 540, 'ALL LEVELS DONE', {
+          fontFamily: FONT_NEO,
+          fontSize: '40px',
+          color: TOKENS.inkHex,
+        })
+        .setOrigin(0.5);
+      this.fadeTextIn(doneTxt, 380);
+    } else {
+      const resumeBtn = neoButton(this, btnX, 560, btnW, btnH, 'RESUME', TOKENS.mint, () => {
+        useGameStore.getState().setCurrentLevel(useGameStore.getState().currentLevel + 1);
+        fadeOutAndStart(this, SCENE_KEYS.Game);
+      });
+      slideUpIn(this, resumeBtn.container, 380);
+    }
+
+    const restartBtn = neoButton(this, btnX, 710, btnW, btnH, 'RESTART', TOKENS.yellow, () => {
+      fadeOutAndStart(this, SCENE_KEYS.Game);
+    });
+    slideUpIn(this, restartBtn.container, 480);
+
+    const menuBtn = neoButton(this, btnX, 860, btnW, btnH, 'MAIN MENU', TOKENS.danger, () => {
+      fadeOutAndStart(this, SCENE_KEYS.Menu);
+    });
+    slideUpIn(this, menuBtn.container, 580);
+  }
+
+  private fadeTextIn(t: Phaser.GameObjects.Text, delay: number, finalAlpha = 1, slide = 32): void {
+    const baseY = t.y;
+    t.y = baseY + slide;
+    t.setAlpha(0);
+    this.tweens.add({
+      targets: t,
+      y: baseY,
+      alpha: finalAlpha,
+      duration: 360,
+      delay,
+      ease: 'Sine.easeOut',
+    });
+  }
+
+  private drawQuotePanel(x: number, y: number, w: number, _h: number): void {
+    const q = getRandomQuote();
+
+    const glyph = this.add
+      .text(x, y - 180, '“', {
+        fontFamily: FONT_NEO,
+        fontSize: '160px',
+        color: TOKENS.inkHex,
+      })
+      .setOrigin(0.5);
+    glyph.setAlpha(0);
+    glyph.setScale(0.6);
+    this.tweens.add({
+      targets: glyph,
+      alpha: 0.25,
+      scale: 1,
+      duration: 420,
+      delay: 220,
+      ease: 'Back.easeOut',
+    });
+
+    const quoteTxt = this.add
+      .text(x, y - 40, q.text, {
+        fontFamily: FONT_NEO,
+        fontSize: '34px',
+        color: TOKENS.inkHex,
+        align: 'center',
+        wordWrap: { width: w - 40 },
+      })
+      .setOrigin(0.5);
+    this.fadeTextIn(quoteTxt, 360);
+
+    const authorTxt = this.add
+      .text(x, y + 120, `— ${q.author.toUpperCase()}`, {
+        fontFamily: FONT_NEO,
+        fontSize: '24px',
+        color: TOKENS.inkHex,
+      })
+      .setOrigin(0.5);
+    this.fadeTextIn(authorTxt, 520, 0.6);
+  }
+
+  private layoutStuck(cx: number): void {
+    const cy = this.scale.height / 2;
     const store = useGameStore.getState();
 
-    if (win) confetti(this);
-
     this.add
-      .text(cx, cy - 324, win ? 'CLEARED!' : 'STUCK!', {
+      .text(cx, cy - 324, 'STUCK!', {
         fontFamily: FONT_NEO,
         fontSize: '94px',
         color: TOKENS.inkHex,
@@ -34,16 +157,11 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(
-        cx,
-        cy - 216,
-        win ? 'Nice work.' : 'No more moves available',
-        {
-          fontFamily: FONT_NEO,
-          fontSize: '26px',
-          color: TOKENS.inkHex,
-        },
-      )
+      .text(cx, cy - 216, 'No more moves available', {
+        fontFamily: FONT_NEO,
+        fontSize: '26px',
+        color: TOKENS.inkHex,
+      })
       .setOrigin(0.5)
       .setAlpha(0.65);
 
@@ -55,32 +173,17 @@ export class GameOverScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    if (win && store.currentLevel < TOTAL_LEVELS) {
-      neoButton(this, cx, cy + 18, 504, 108, 'NEXT LEVEL', TOKENS.mint, () => {
-        useGameStore.getState().setCurrentLevel(store.currentLevel + 1);
-        fadeOutAndStart(this, SCENE_KEYS.Game);
-      });
-    } else if (win) {
-      this.add
-        .text(cx, cy + 10, 'ALL LEVELS DONE', {
-          fontFamily: FONT_NEO,
-          fontSize: '44px',
-          color: TOKENS.inkHex,
-        })
-        .setOrigin(0.5);
-    } else {
-      let busy = false;
-      neoButton(this, cx, cy + 18, 504, 108, 'CONTINUE (AD)', TOKENS.sky, async () => {
-        if (busy) return;
-        busy = true;
-        try {
-          const ok = await AdManager.showRewarded('continue');
-          if (ok) fadeOutAndStart(this, SCENE_KEYS.Game);
-        } finally {
-          busy = false;
-        }
-      });
-    }
+    let busy = false;
+    neoButton(this, cx, cy + 18, 504, 108, 'CONTINUE (AD)', TOKENS.sky, async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const ok = await AdManager.showRewarded('continue');
+        if (ok) fadeOutAndStart(this, SCENE_KEYS.Game);
+      } finally {
+        busy = false;
+      }
+    });
 
     neoButton(this, cx, cy + 154, 504, 108, 'RETRY', TOKENS.yellow, () => {
       fadeOutAndStart(this, SCENE_KEYS.Game);

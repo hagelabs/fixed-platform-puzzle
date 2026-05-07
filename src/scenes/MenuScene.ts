@@ -88,27 +88,11 @@ export class MenuScene extends Phaser.Scene {
     });
     slideUpIn(this, lsBtn.container, 360);
 
-    const tutBtn = neoButton(
-      this,
-      cx,
-      740,
-      500,
-      116,
-      store.tutorialDone ? 'REPLAY TUTORIAL' : 'HOW TO PLAY',
-      TOKENS.yellow,
-      () => {
-        AudioManager.uiTap();
-        this.cleanupDemo();
-        fadeOutAndStart(this, SCENE_KEYS.Tutorial);
-      },
-    );
-    slideUpIn(this, tutBtn.container, 440);
-
     if (store.unlockedLevel > 1) {
       const resetBtn = neoButton(
         this,
         cx,
-        880,
+        740,
         360,
         86,
         'RESET',
@@ -128,7 +112,7 @@ export class MenuScene extends Phaser.Scene {
         },
         { textSize: 32 },
       );
-      slideUpIn(this, resetBtn.container, 520);
+      slideUpIn(this, resetBtn.container, 440);
     }
 
     const audioLabel = () =>

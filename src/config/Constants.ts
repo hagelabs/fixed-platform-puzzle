@@ -25,7 +25,6 @@ export const SCENE_KEYS = {
   Menu: "MenuScene",
   LevelSelect: "LevelSelectScene",
   Game: "GameScene",
-  Tutorial: "TutorialScene",
   Pause: "PauseScene",
   GameOver: "GameOverScene",
 } as const;

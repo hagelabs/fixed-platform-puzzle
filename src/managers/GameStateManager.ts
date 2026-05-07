@@ -10,7 +10,7 @@ interface GameState {
   movesThisLevel: number;
   sfxEnabled: boolean;
   audioEnabled: boolean; // alias of sfxEnabled (kept for legacy reads)
-  tutorialDone: boolean;
+  tutorialSeenLevels: number[];
 
   watchCooldownUntil: number;
 
@@ -19,7 +19,8 @@ interface GameState {
   incMoves: () => void;
   resetMoves: () => void;
   toggleAudio: () => void;
-  setTutorialDone: (v: boolean) => void;
+  hasSeenTutorial: (level: number) => boolean;
+  markTutorialSeen: (level: number) => void;
   resetProgress: () => void;
   unlockAll: () => void;
 
@@ -36,7 +37,7 @@ const store = createStore<GameState>()(
       movesThisLevel: 0,
       sfxEnabled: true,
       audioEnabled: true,
-      tutorialDone: false,
+      tutorialSeenLevels: [],
 
       watchCooldownUntil: 0,
 
@@ -52,10 +53,16 @@ const store = createStore<GameState>()(
           const next = !s.sfxEnabled;
           return { sfxEnabled: next, audioEnabled: next };
         }),
-      setTutorialDone: (v) => set({ tutorialDone: v }),
+      hasSeenTutorial: (level) => get().tutorialSeenLevels.includes(level),
+      markTutorialSeen: (level) =>
+        set((s) =>
+          s.tutorialSeenLevels.includes(level)
+            ? s
+            : { tutorialSeenLevels: [...s.tutorialSeenLevels, level] },
+        ),
       resetProgress: () =>
         set({
-          currentLevel: 1, unlockedLevel: 1, movesThisLevel: 0, tutorialDone: false,
+          currentLevel: 1, unlockedLevel: 1, movesThisLevel: 0, tutorialSeenLevels: [],
           watchCooldownUntil: 0,
         }),
       unlockAll: () => set({ unlockedLevel: TOTAL_LEVELS }),
@@ -75,7 +82,7 @@ const store = createStore<GameState>()(
         unlockedLevel: s.unlockedLevel,
         sfxEnabled: s.sfxEnabled,
         audioEnabled: s.audioEnabled,
-        tutorialDone: s.tutorialDone,
+        tutorialSeenLevels: s.tutorialSeenLevels,
         watchCooldownUntil: s.watchCooldownUntil,
       }) as Partial<GameState>,
       migrate: (persisted: unknown) => {
@@ -87,6 +94,10 @@ const store = createStore<GameState>()(
           if (p.audioEnabled === undefined && typeof p.sfxEnabled === 'boolean') {
             p.audioEnabled = p.sfxEnabled;
           }
+          if (!Array.isArray(p.tutorialSeenLevels)) {
+            p.tutorialSeenLevels = p.tutorialDone === true ? [1, 3, 5] : [];
+          }
+          delete p.tutorialDone;
         }
         return persisted as GameState;
       },

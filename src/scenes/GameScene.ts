@@ -29,6 +29,7 @@ import {
   dottedBackground,
   NeoButtonHandle,
 } from '../ui/Theme';
+import { LevelTutorial, LEVEL_TUTORIALS } from '../ui/LevelTutorial';
 
 export class GameScene extends Phaser.Scene {
   private grid!: Grid;
@@ -51,6 +52,7 @@ export class GameScene extends Phaser.Scene {
   private lastRemovalAt = 0;
   private comboCount = 0;
   private prevLocked = new Map<string, boolean>();
+  private tutorial?: LevelTutorial;
 
   constructor() {
     super({ key: SCENE_KEYS.Game });
@@ -111,14 +113,40 @@ export class GameScene extends Phaser.Scene {
       SDKManager.gameplayStop();
       this.input.off('pointermove', this.refreshHover, this);
       this.events.off('block:settled', this.refreshHover, this);
+      this.events.off('tutorial:moved', this.dismissTutorial, this);
+      this.tutorial?.destroy();
+      this.tutorial = undefined;
       this.hovered = null;
       AudioManager.stopAmbient();
     });
 
-    if (this.registry.get('autoplaySolution')) {
+    const willAutoplay = !!this.registry.get('autoplaySolution');
+    if (willAutoplay) {
       this.registry.remove('autoplaySolution');
       this.time.delayedCall(400, () => this.runAutoplay());
+    } else {
+      this.maybeShowTutorial();
     }
+  }
+
+  private maybeShowTutorial(): void {
+    const store = useGameStore.getState();
+    const level = store.currentLevel;
+    const cfg = LEVEL_TUTORIALS[level];
+    if (!cfg) return;
+    if (store.hasSeenTutorial(level)) return;
+    this.tutorial = new LevelTutorial(this);
+    this.tutorial.show(cfg, this.blocks, this.grid);
+    this.events.on('tutorial:moved', this.dismissTutorial, this);
+  }
+
+  private dismissTutorial(): void {
+    if (!this.tutorial) return;
+    const level = useGameStore.getState().currentLevel;
+    useGameStore.getState().markTutorialSeen(level);
+    this.tutorial.dismiss();
+    this.tutorial = undefined;
+    this.events.off('tutorial:moved', this.dismissTutorial, this);
   }
 
   private refreshHover(): void {

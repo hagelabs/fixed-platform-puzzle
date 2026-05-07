@@ -4,7 +4,6 @@ import { BootScene } from "../scenes/BootScene";
 import { MenuScene } from "../scenes/MenuScene";
 import { LevelSelectScene } from "../scenes/LevelSelectScene";
 import { GameScene } from "../scenes/GameScene";
-import { TutorialScene } from "../scenes/TutorialScene";
 import { PauseScene } from "../scenes/PauseScene";
 import { GameOverScene } from "../scenes/GameOverScene";
 
@@ -43,7 +42,6 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     MenuScene,
     LevelSelectScene,
     GameScene,
-    TutorialScene,
     PauseScene,
     GameOverScene,
   ],

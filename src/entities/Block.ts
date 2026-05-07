@@ -285,24 +285,59 @@ export class Block extends Phaser.GameObjects.Container {
     }
   }
 
-  public flyOff(direction: Direction, onDone: () => void): void {
+  public exitTo(
+    grid: Grid,
+    lastInCol: number,
+    lastInRow: number,
+    dir: Direction,
+    slideDistance: number,
+    onArrival: () => void,
+    onDone: () => void,
+  ): void {
     this.disableInteractive();
-    const dist = 320;
-    const dx = direction === 'LEFT' ? -dist : direction === 'RIGHT' ? dist : 0;
-    const dy = direction === 'UP' ? -dist : direction === 'DOWN' ? dist : 0;
+    const [w, h] = this.size;
+    const halfCell = grid.cellSize / 2;
+
+    const playExit = (pastMul: number) => {
+      onArrival();
+      const past = grid.cellSize * pastMul;
+      const dx = dir === 'LEFT' ? -past : dir === 'RIGHT' ? past : 0;
+      const dy = dir === 'UP' ? -past : dir === 'DOWN' ? past : 0;
+      this.scene.tweens.add({
+        targets: this,
+        x: this.x + dx,
+        y: this.y + dy,
+        alpha: 0,
+        scale: 0.5,
+        duration: 220,
+        ease: 'Cubic.easeIn',
+        onComplete: () => {
+          this.removed = true;
+          onDone();
+          this.destroy();
+        },
+      });
+    };
+
+    if (slideDistance <= 0) {
+      // Already adjacent to portal — skip slide phase, exit straight away.
+      playExit(0.95);
+      return;
+    }
+
+    const edgeDx = dir === 'LEFT' ? -halfCell : dir === 'RIGHT' ? halfCell : 0;
+    const edgeDy = dir === 'UP' ? -halfCell : dir === 'DOWN' ? halfCell : 0;
+    const tx = grid.worldX(lastInCol) + ((w - 1) * grid.cellSize) / 2 + edgeDx;
+    const ty = grid.worldY(lastInRow) + ((h - 1) * grid.cellSize) / 2 + edgeDy;
+    const slideMs = Math.min(460, 120 + (slideDistance + 0.5) * 42);
+
     this.scene.tweens.add({
       targets: this,
-      x: this.x + dx,
-      y: this.y + dy,
-      alpha: 0,
-      scale: 0.6,
-      duration: 240,
-      ease: 'Cubic.easeIn',
-      onComplete: () => {
-        this.removed = true;
-        onDone();
-        this.destroy();
-      },
+      x: tx,
+      y: ty,
+      duration: slideMs,
+      ease: 'Sine.easeOut',
+      onComplete: () => playExit(0.45),
     });
   }
 
@@ -343,5 +378,17 @@ export class Block extends Phaser.GameObjects.Container {
       this.iconG.x = dx;
       this.iconG.y = dy;
     }
+  }
+
+  public clearVisualOffsetSmooth(duration = 110): void {
+    const targets: Phaser.GameObjects.GameObject[] = [this.bodyG];
+    if (this.iconG) targets.push(this.iconG);
+    this.scene.tweens.add({
+      targets,
+      x: 0,
+      y: 0,
+      duration,
+      ease: 'Sine.easeOut',
+    });
   }
 }

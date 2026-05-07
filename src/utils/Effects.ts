@@ -149,6 +149,46 @@ export function removalBloom(
   });
 }
 
+export function portalSuck(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  dir: Direction,
+): void {
+  for (let i = 0; i < 6; i++) {
+    const off = 26 + Math.random() * 22;
+    const lateral = (Math.random() - 0.5) * 36;
+    const ox = dir === 'LEFT' ? off : dir === 'RIGHT' ? -off : lateral;
+    const oy = dir === 'UP' ? off : dir === 'DOWN' ? -off : lateral;
+    const p = scene.add.rectangle(x + ox, y + oy, 9, 9, TOKENS.exitGlow);
+    p.setStrokeStyle(2.5, TOKENS.ink, 1);
+    scene.tweens.add({
+      targets: p,
+      x,
+      y,
+      alpha: 0,
+      scale: 0.35,
+      duration: 240 + Math.random() * 120,
+      ease: 'Sine.easeIn',
+      onComplete: () => p.destroy(),
+    });
+  }
+  const ring = scene.add.graphics();
+  ring.lineStyle(8, TOKENS.exitGlow, 1);
+  ring.strokeCircle(0, 0, 38);
+  ring.x = x;
+  ring.y = y;
+  ring.setScale(0.55);
+  scene.tweens.add({
+    targets: ring,
+    scale: 2.2,
+    alpha: 0,
+    duration: 320,
+    ease: 'Cubic.easeOut',
+    onComplete: () => ring.destroy(),
+  });
+}
+
 export function deadEndPulse(scene: Phaser.Scene): void {
   const { width, height } = scene.scale;
   const overlay = scene.add.rectangle(width / 2, height / 2, width, height, TOKENS.danger, 0);

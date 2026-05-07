@@ -22,6 +22,7 @@ import {
   removalBloom,
   burstParticles,
   screenshake,
+  portalSuck,
 } from '../utils/Effects';
 
 interface TutorialStep {
@@ -332,17 +333,45 @@ export class TutorialScene extends Phaser.Scene {
 
     // exit
     this.grid.clear(block);
+    const startCol = block.gridPos[0];
+    const startRow = block.gridPos[1];
     block.gridPos = [result.toCol, result.toRow];
     this.busy = true;
-    AudioManager.pop();
-    removalBloom(this, block.x, block.y, COLORS[block.color]);
-    burstParticles(this, block.x, block.y, COLORS[block.color], 10);
-    screenshake(this, 0.004, 100);
-    block.flyOff(dir, () => {
-      this.refreshDependents();
-      this.busy = false;
-      this.afterRemove();
-    });
+
+    const lastInCol =
+      dir === 'RIGHT' ? result.toCol - 1
+      : dir === 'LEFT' ? result.toCol + 1
+      : result.toCol;
+    const lastInRow =
+      dir === 'DOWN' ? result.toRow - 1
+      : dir === 'UP' ? result.toRow + 1
+      : result.toRow;
+    const slideDist =
+      Math.abs(lastInCol - startCol) + Math.abs(lastInRow - startRow);
+    const exitColor = COLORS[block.color];
+
+    const grid = this.grid!;
+    block.exitTo(
+      grid,
+      lastInCol,
+      lastInRow,
+      dir,
+      slideDist,
+      () => {
+        const portalX = grid.worldX(lastInCol);
+        const portalY = grid.worldY(lastInRow);
+        AudioManager.pop();
+        removalBloom(this, portalX, portalY, exitColor);
+        burstParticles(this, portalX, portalY, exitColor, 12);
+        portalSuck(this, portalX, portalY, dir);
+        screenshake(this, 0.005, 110);
+      },
+      () => {
+        this.refreshDependents();
+        this.busy = false;
+        this.afterRemove();
+      },
+    );
   }
 
   private refreshDependents(): void {

@@ -19,6 +19,7 @@ import {
   dustPuff,
   removalBloom,
   deadEndPulse,
+  portalSuck,
 } from '../utils/Effects';
 import {
   TOKENS,
@@ -39,12 +40,14 @@ export class GameScene extends Phaser.Scene {
   private movesText!: Phaser.GameObjects.Text;
   private undoBtn!: NeoButtonHandle;
   private watchBtn!: NeoButtonHandle;
+  private restartBtn!: NeoButtonHandle;
   private deadEndShown = false;
 
   private hovered: Block | null = null;
   private busy = false;
   private watchPlaying = false;
   private autoplayActive = false;
+  private autoplayToken = 0;
   private lastRemovalAt = 0;
   private comboCount = 0;
   private prevLocked = new Map<string, boolean>();
@@ -60,6 +63,11 @@ export class GameScene extends Phaser.Scene {
     this.history = [];
     this.deadEndShown = false;
     this.busy = false;
+    this.watchPlaying = false;
+    this.autoplayActive = false;
+    this.comboCount = 0;
+    this.lastRemovalAt = 0;
+    this.autoplayToken++;
     Analytics.log('level_started', { level: store.currentLevel });
 
     await AdManager.preLevelInterstitial();
@@ -99,6 +107,7 @@ export class GameScene extends Phaser.Scene {
     AudioManager.startAmbient();
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.autoplayToken++;
       SDKManager.gameplayStop();
       this.input.off('pointermove', this.refreshHover, this);
       this.events.off('block:settled', this.refreshHover, this);
@@ -188,7 +197,7 @@ export class GameScene extends Phaser.Scene {
       loop: true,
       callback: () => this.refreshWatchLabel(),
     });
-    neoButton(
+    this.restartBtn = neoButton(
       this,
       width / 2 + btnSpacing,
       bottomY,
@@ -196,7 +205,10 @@ export class GameScene extends Phaser.Scene {
       86,
       'RESTART',
       TOKENS.danger,
-      () => this.scene.restart(),
+      () => {
+        if (this.watchPlaying) return;
+        this.scene.restart();
+      },
       { textSize: 34 },
     );
   }
@@ -251,6 +263,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private async runAutoplay(): Promise<void> {
+    const token = this.autoplayToken;
     const store = useGameStore.getState();
     const moves: SolutionMove[] = getSolution(store.currentLevel);
     if (moves.length === 0) {
@@ -261,11 +274,13 @@ export class GameScene extends Phaser.Scene {
     this.watchPlaying = true;
     this.undoBtn.setEnabled(false);
     this.watchBtn.setEnabled(false);
+    this.restartBtn.setEnabled(false);
     this.refreshWatchLabel();
 
     for (const mv of moves) {
       // wait for any in-flight animation
       await this.waitUntilIdle();
+      if (token !== this.autoplayToken) return;
       const block = this.blocks.find((b) => b.blockId === mv.blockId);
       if (!block || block.removed) continue;
       this.autoplayActive = true;
@@ -274,10 +289,13 @@ export class GameScene extends Phaser.Scene {
       this.autoplayActive = false;
       // small visual gap between moves
       await this.delay(120);
+      if (token !== this.autoplayToken) return;
     }
     await this.waitUntilIdle();
+    if (token !== this.autoplayToken) return;
     this.watchPlaying = false;
     this.undoBtn.setEnabled(true);
+    this.restartBtn.setEnabled(true);
     this.refreshWatchLabel();
   }
 
@@ -403,18 +421,46 @@ export class GameScene extends Phaser.Scene {
       removed: true,
     });
     this.grid.clear(block);
+    const startCol = block.gridPos[0];
+    const startRow = block.gridPos[1];
     block.gridPos = [result.toCol, result.toRow];
     this.busy = true;
-    this.handleCombo();
-    AudioManager.pop(this.computePan(result.toCol));
-    removalBloom(this, block.x, block.y, COLORS[block.color]);
-    burstParticles(this, block.x, block.y, COLORS[block.color], 10);
-    screenshake(this, 0.004, 100);
-    block.flyOff(dir, () => {
-      this.refreshDependents();
-      this.afterRemove();
-      this.busy = false;
-    });
+    AudioManager.slideStart(result.distance, pan);
+
+    const lastInCol =
+      dir === 'RIGHT' ? result.toCol - 1
+      : dir === 'LEFT' ? result.toCol + 1
+      : result.toCol;
+    const lastInRow =
+      dir === 'DOWN' ? result.toRow - 1
+      : dir === 'UP' ? result.toRow + 1
+      : result.toRow;
+    const slideDist =
+      Math.abs(lastInCol - startCol) + Math.abs(lastInRow - startRow);
+    const exitColor = COLORS[block.color];
+
+    block.exitTo(
+      this.grid,
+      lastInCol,
+      lastInRow,
+      dir,
+      slideDist,
+      () => {
+        const portalX = this.grid.worldX(lastInCol);
+        const portalY = this.grid.worldY(lastInRow);
+        AudioManager.pop(this.computePan(result.toCol));
+        this.handleCombo();
+        removalBloom(this, portalX, portalY, exitColor);
+        burstParticles(this, portalX, portalY, exitColor, 12);
+        portalSuck(this, portalX, portalY, dir);
+        screenshake(this, 0.005, 110);
+      },
+      () => {
+        this.refreshDependents();
+        this.afterRemove();
+        this.busy = false;
+      },
+    );
     this.events.emit('tutorial:moved');
   }
 

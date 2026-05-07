@@ -6,7 +6,7 @@ import { AudioManager } from './AudioManager';
 
 export type SwipeAttempt = (block: Block, direction: Direction) => void;
 
-const GHOST_LIMIT = 18;
+const GHOST_LIMIT = 40;
 
 export class InputManager {
   private dragStart: { x: number; y: number } | null = null;
@@ -66,7 +66,6 @@ export class InputManager {
       return;
     }
     const block = this.dragBlock;
-    block.setVisualOffset(0, 0);
 
     const dx = pointer.x - this.dragStart.x;
     const dy = pointer.y - this.dragStart.y;
@@ -77,7 +76,11 @@ export class InputManager {
       let dir: Direction;
       if (adx > ady) dir = dx > 0 ? 'RIGHT' : 'LEFT';
       else dir = dy > 0 ? 'DOWN' : 'UP';
+      // Smooth offset → 0 in parallel with the swipe tween. No rearward snap.
+      block.clearVisualOffsetSmooth(90);
       this.onSwipe(block, dir);
+    } else {
+      block.clearVisualOffsetSmooth(120);
     }
     this.reset();
   }

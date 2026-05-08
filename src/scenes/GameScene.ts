@@ -79,6 +79,7 @@ export class GameScene extends Phaser.Scene {
     this.input.topOnly = true;
     this.hovered = null;
     this.input.on('pointermove', this.refreshHover, this);
+    this.input.on('pointerdown', this.onPointerDownHint, this);
     this.events.on('block:settled', this.refreshHover, this);
     this.movement = new MovementSystem();
 
@@ -112,6 +113,7 @@ export class GameScene extends Phaser.Scene {
       this.autoplayToken++;
       SDKManager.gameplayStop();
       this.input.off('pointermove', this.refreshHover, this);
+      this.input.off('pointerdown', this.onPointerDownHint, this);
       this.events.off('block:settled', this.refreshHover, this);
       this.events.off('tutorial:moved', this.dismissTutorial, this);
       this.tutorial?.destroy();
@@ -164,6 +166,73 @@ export class GameScene extends Phaser.Scene {
     this.hovered?.setHover(false);
     this.hovered = next;
     this.hovered?.setHover(true);
+  }
+
+  private onPointerDownHint(pointer: Phaser.Input.Pointer): void {
+    if (this.busy || this.watchPlaying) return;
+    const { height } = this.scale;
+    if (pointer.y < 144 || pointer.y > height - 144) return;
+    for (const b of this.blocks) {
+      if (b.containsPointerForHint(pointer.worldX, pointer.worldY)) {
+        this.showDependencyHint(b);
+        return;
+      }
+    }
+  }
+
+  private showDependencyHint(dep: Block): void {
+    if (!dep.dependsOn) return;
+    const parent = this.blocks.find((b) => b.blockId === dep.dependsOn);
+    if (!parent || parent.removed) return;
+    this.drawHintRing(parent);
+    AudioManager.hover();
+  }
+
+  private drawHintRing(target: Block): void {
+    const cell = this.grid.cellSize;
+    const halfW = (target.size[0] * cell - 14) / 2;
+    const halfH = (target.size[1] * cell - 14) / 2;
+    const radius = Math.max(halfW, halfH) + 22;
+
+    const ring = this.add.graphics();
+    const dashes = 14;
+    const step = (Math.PI * 2) / dashes;
+    const fill = step * 0.55;
+    ring.lineStyle(8, TOKENS.exitGlow, 1);
+    for (let i = 0; i < dashes; i++) {
+      const start = i * step;
+      ring.beginPath();
+      ring.arc(0, 0, radius, start, start + fill);
+      ring.strokePath();
+    }
+
+    const container = this.add.container(target.x, target.y, [ring]);
+    container.setDepth(80);
+    container.setScale(0.82);
+    container.setAlpha(0);
+
+    this.tweens.add({
+      targets: container,
+      scale: 1,
+      alpha: 1,
+      duration: 200,
+      ease: 'Back.easeOut',
+    });
+    this.tweens.add({
+      targets: container,
+      angle: 60,
+      duration: 1100,
+      ease: 'Sine.easeInOut',
+    });
+    this.tweens.add({
+      targets: container,
+      alpha: 0,
+      scale: 1.18,
+      duration: 700,
+      delay: 400,
+      ease: 'Sine.easeIn',
+      onComplete: () => container.destroy(),
+    });
   }
 
   private drawHud(): void {

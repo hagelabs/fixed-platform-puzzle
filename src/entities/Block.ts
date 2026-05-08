@@ -255,11 +255,22 @@ export class Block extends Phaser.GameObjects.Container {
     if (this.type === 'dependent' && this.locked) return false;
     const localX = worldX - this.x;
     const localY = worldY - this.y;
-    
+
     const shadow = TOKENS.shadowOffset;
     const hw = this.hitW / 2;
     const hh = this.hitH / 2;
-    
+
+    return localX >= -hw && localX <= hw + shadow && localY >= -hh && localY <= hh + shadow;
+  }
+
+  public containsPointerForHint(worldX: number, worldY: number): boolean {
+    if (this.removed) return false;
+    if (this.type !== 'dependent' || !this.locked) return false;
+    const localX = worldX - this.x;
+    const localY = worldY - this.y;
+    const shadow = TOKENS.shadowOffset;
+    const hw = this.hitW / 2;
+    const hh = this.hitH / 2;
     return localX >= -hw && localX <= hw + shadow && localY >= -hh && localY <= hh + shadow;
   }
 

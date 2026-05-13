@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS, TOTAL_LEVELS } from '../config/Constants';
+import { SCENE_KEYS } from '../config/Constants';
 import { useGameStore } from '../managers/GameStateManager';
 import { AudioManager } from '../managers/AudioManager';
 import { AdManager } from '../managers/AdManager';
@@ -16,7 +16,6 @@ import {
   floatingDecor,
   popIn,
   slideUpIn,
-  idlePulse,
 } from '../ui/Theme';
 
 export class LevelSelectScene extends Phaser.Scene {
@@ -51,15 +50,18 @@ export class LevelSelectScene extends Phaser.Scene {
     }, { w: 140, h: 100, fill: TOKENS.white, textSize: 46 });
     slideUpIn(this, back.container, 60, -20);
 
-    const allUnlocked = useGameStore.getState().unlockedLevel >= TOTAL_LEVELS;
-    if (!allUnlocked && SDKManager.hasRewardedAds()) {
+    // Per-pack unlock button: unlocks only the ACTIVE pack via rewarded ad.
+    const activePack = PACKS.find((p) => p.id === this.activePackId);
+    const packLastId = activePack ? activePack.levelIds[activePack.levelIds.length - 1] : 0;
+    const packAlreadyUnlocked = useGameStore.getState().unlockedLevel >= packLastId;
+    if (activePack && !packAlreadyUnlocked && SDKManager.hasRewardedAds()) {
       const unlockBtn = neoButton(
         this,
         width - 260,
         100,
         420,
         86,
-        'UNLOCK ALL (AD)',
+        `UNLOCK ${activePack.name.toUpperCase()} (AD)`,
         TOKENS.yellow,
         async () => {
           AudioManager.uiTap();
@@ -67,14 +69,14 @@ export class LevelSelectScene extends Phaser.Scene {
           unlockBtn.setLabel('LOADING...');
           const ok = await AdManager.showRewarded('unlock_all');
           if (ok) {
-            useGameStore.getState().unlockAll();
+            useGameStore.getState().unlockUpTo(packLastId);
             this.scene.restart();
           } else {
             unlockBtn.setEnabled(true);
-            unlockBtn.setLabel('UNLOCK ALL (AD)');
+            unlockBtn.setLabel(`UNLOCK ${activePack.name.toUpperCase()} (AD)`);
           }
         },
-        { textSize: 28 },
+        { textSize: 24 },
       );
       slideUpIn(this, unlockBtn.container, 100, -20);
     }
@@ -200,11 +202,34 @@ export class LevelSelectScene extends Phaser.Scene {
           pips.setPosition(0, tile / 2 - 14);
           btn.container.add(pips);
         }
+        // Hover wobble — tilt left then right then settle.
+        btn.container.on('pointerover', () => {
+          this.tweens.add({
+            targets: btn.container,
+            angle: { from: -3, to: 3 },
+            duration: 120,
+            yoyo: true,
+            ease: 'Sine.easeInOut',
+            onComplete: () => btn.container.setAngle(0),
+          });
+        });
       }
 
       if (isCurrent && !locked) {
         this.time.delayedCall(240 + i * 14 + 280, () => {
-          idlePulse(this, btn.container, 1.08, 900);
+          const halo = this.add.graphics();
+          halo.lineStyle(6, TOKENS.ink, 1);
+          halo.strokeCircle(0, 0, tile * 0.85);
+          halo.setAlpha(0);
+          btn.container.add(halo);
+          this.tweens.add({
+            targets: halo,
+            scale: { from: 0.7, to: 1.4 },
+            alpha: { from: 0.55, to: 0 },
+            duration: 1100,
+            repeat: -1,
+            ease: 'Sine.easeOut',
+          });
         });
       }
     });

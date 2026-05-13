@@ -12,7 +12,6 @@ import { Grid } from "../entities/Grid";
 import { Block } from "../entities/Block";
 import { InputManager } from "../managers/InputManager";
 import { MovementSystem } from "../systems/MovementSystem";
-import { suggestMove } from "../systems/HintSystem";
 import { Direction, MoveHistoryEntry } from "../types/Game";
 import { AudioManager } from "../managers/AudioManager";
 import { Analytics } from "../managers/AnalyticsManager";
@@ -49,7 +48,6 @@ export class GameScene extends Phaser.Scene {
   private movesText!: Phaser.GameObjects.Text;
   private undoBtn!: NeoButtonHandle;
   private watchBtn!: NeoButtonHandle;
-  private hintBtn!: NeoButtonHandle;
   private restartBtn!: NeoButtonHandle;
   private deadEndShown = false;
 
@@ -294,11 +292,11 @@ export class GameScene extends Phaser.Scene {
     );
 
     const bottomY = this.scale.height - 55;
-    const btnW = 200;
-    const btnSpacing = 220;
+    const btnW = 240;
+    const btnSpacing = 260;
     this.undoBtn = neoButton(
       this,
-      width / 2 - btnSpacing * 1.5,
+      width / 2 - btnSpacing,
       bottomY,
       btnW,
       86,
@@ -307,27 +305,16 @@ export class GameScene extends Phaser.Scene {
       () => this.undo(),
       { textSize: 32 },
     );
-    this.hintBtn = neoButton(
-      this,
-      width / 2 - btnSpacing * 0.5,
-      bottomY,
-      btnW,
-      86,
-      "HINT",
-      ui.secondary,
-      () => this.requestHint(),
-      { textSize: 32 },
-    );
     this.watchBtn = neoButton(
       this,
-      width / 2 + btnSpacing * 0.5,
+      width / 2,
       bottomY,
       btnW,
       86,
-      "SKIP",
+      "I'M STUCK",
       ui.primary,
       () => this.requestWatch(),
-      { textSize: 26 },
+      { textSize: 30 },
     );
     this.refreshWatchLabel();
     this.time.addEvent({
@@ -337,7 +324,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.restartBtn = neoButton(
       this,
-      width / 2 + btnSpacing * 1.5,
+      width / 2 + btnSpacing,
       bottomY,
       btnW,
       86,
@@ -351,94 +338,16 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
-  private async requestHint(): Promise<void> {
-    if (this.busy || this.watchPlaying) return;
-    AudioManager.uiTap();
-    if (SDKManager.hasRewardedAds()) {
-      this.hintBtn.setEnabled(false);
-      const ok = await AdManager.showRewarded("hint");
-      this.hintBtn.setEnabled(true);
-      if (!ok) {
-        AudioManager.thud();
-        return;
-      }
-    }
-    const level = getLevel(useGameStore.getState().currentLevel);
-    const move = suggestMove(this.blocks, this.grid, level.iceCells ?? [], 50000, 80);
-    if (!move) {
-      this.hintBtn.setLabel("NO HINT");
-      this.time.delayedCall(1400, () => this.hintBtn.setLabel("HINT"));
-      AudioManager.thud();
-      return;
-    }
-    Analytics.track("hint_used", { type: "single", levelId: useGameStore.getState().currentLevel, blockId: move.blockId, dir: move.dir });
-    this.showHintArrow(move.blockId, move.dir);
-  }
-
-  private showHintArrow(blockId: string, dir: Direction): void {
-    const block = this.blocks.find((b) => b.blockId === blockId);
-    if (!block) return;
-    const offset = this.grid.cellSize * 0.7;
-    const dx = dir === 'LEFT' ? -offset : dir === 'RIGHT' ? offset : 0;
-    const dy = dir === 'UP' ? -offset : dir === 'DOWN' ? offset : 0;
-    const baseX = block.x;
-    const baseY = block.y;
-    const arrow = this.add.graphics();
-    arrow.fillStyle(0x55B4FF, 1);
-    arrow.lineStyle(4, 0x222222, 1);
-    const s = this.grid.cellSize * 0.35;
-    const angle =
-      dir === 'RIGHT' ? 0 : dir === 'DOWN' ? Math.PI / 2 : dir === 'LEFT' ? Math.PI : -Math.PI / 2;
-    arrow.fillTriangle(s * 0.6, 0, -s * 0.4, s * 0.5, -s * 0.4, -s * 0.5);
-    arrow.strokeTriangle(s * 0.6, 0, -s * 0.4, s * 0.5, -s * 0.4, -s * 0.5);
-    arrow.setPosition(baseX + dx, baseY + dy);
-    arrow.setRotation(angle);
-    arrow.setAlpha(0);
-    this.tweens.add({
-      targets: arrow,
-      alpha: 1,
-      scale: { from: 0.6, to: 1 },
-      duration: 240,
-      ease: 'Back.easeOut',
-    });
-    this.tweens.add({
-      targets: arrow,
-      x: arrow.x + dx * 0.2,
-      y: arrow.y + dy * 0.2,
-      duration: 700,
-      yoyo: true,
-      repeat: 2,
-      ease: 'Sine.easeInOut',
-    });
-    this.time.delayedCall(2800, () => {
-      this.tweens.add({
-        targets: arrow,
-        alpha: 0,
-        duration: 280,
-        onComplete: () => arrow.destroy(),
-      });
-    });
-    // pulse the block
-    this.tweens.add({
-      targets: block,
-      scale: { from: 1, to: 1.08 },
-      duration: 380,
-      yoyo: true,
-      repeat: 2,
-      ease: 'Sine.easeInOut',
-    });
-  }
-
   private refreshWatchLabel(): void {
     const store = useGameStore.getState();
     if (SDKManager.hasRewardedAds()) {
-      this.watchBtn.setLabel("WATCH AD");
+      this.watchBtn.setLabel("I'M STUCK");
       this.watchBtn.setEnabled(!this.watchPlaying);
       return;
     }
     const sec = store.getWatchCooldownSecondsLeft();
     if (sec <= 0) {
-      this.watchBtn.setLabel("WATCH");
+      this.watchBtn.setLabel("I'M STUCK");
       this.watchBtn.setEnabled(!this.watchPlaying);
     } else {
       const m = Math.floor(sec / 60);

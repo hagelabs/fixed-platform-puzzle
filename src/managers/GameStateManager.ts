@@ -37,6 +37,7 @@ interface GameState {
   setEquippedPalette: (id: string) => void;
   resetProgress: () => void;
   unlockAll: () => void;
+  unlockUpTo: (levelId: number) => void;
 
   startWatchCooldown: () => void;
   isWatchOnCooldown: () => boolean;
@@ -96,6 +97,10 @@ const store = createStore<GameState>()(
           bestStars: {}, watchCooldownUntil: 0,
         }),
       unlockAll: () => set({ unlockedLevel: TOTAL_LEVELS }),
+      unlockUpTo: (levelId) =>
+        set((s) => ({
+          unlockedLevel: Math.min(TOTAL_LEVELS, Math.max(s.unlockedLevel, levelId)),
+        })),
 
       startWatchCooldown: () => {
         if (DEV) return;

@@ -178,25 +178,43 @@
       }
     </style>
     <% if (BUILD_TARGET === 'poki') { %>
-    <script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js" async onerror="console.info('[SDK] poki not loaded')"></script>
+    <script
+      src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"
+      async
+      onerror="console.info('[SDK] poki not loaded')"
+    ></script>
     <% } else if (BUILD_TARGET === 'crazygames') { %>
-    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js" async onerror="console.info('[SDK] cg not loaded')"></script>
+    <script
+      src="https://sdk.crazygames.com/crazygames-sdk-v3.js"
+      async
+      onerror="console.info('[SDK] cg not loaded')"
+    ></script>
     <% } else if (BUILD_TARGET === 'gamedistribution') { %>
     <script>
-      window.GD_OPTIONS = { gameId: "TODO_REPLACE_GAME_ID", advertisementSettings: { autoplay: false } };
+      window.GD_OPTIONS = {
+        gameId: "d2a3a2ad4ccf4847a48e58818fd0294b",
+        advertisementSettings: { autoplay: false },
+      };
       (function (d, s) {
-        var t = d.createElement(s); t.async = true;
+        var t = d.createElement(s);
+        t.async = true;
         t.src = "https://html5.api.gamedistribution.com/main.min.js";
-        t.onerror = function () { console.info("[SDK] gd not loaded"); };
-        var f = d.getElementsByTagName(s)[0]; f.parentNode.insertBefore(t, f);
+        t.onerror = function () {
+          console.info("[SDK] gd not loaded");
+        };
+        var f = d.getElementsByTagName(s)[0];
+        f.parentNode.insertBefore(t, f);
       })(document, "script");
     </script>
     <% } else if (BUILD_TARGET === 'platform') { %>
     <script>
       (function loadSDK(src) {
         var s = document.createElement("script");
-        s.src = src; s.async = true;
-        s.onerror = function () { console.info("[SDK] not loaded:", src); };
+        s.src = src;
+        s.async = true;
+        s.onerror = function () {
+          console.info("[SDK] not loaded:", src);
+        };
         document.head.appendChild(s);
       })(
         location.hostname.indexOf("crazygames") !== -1

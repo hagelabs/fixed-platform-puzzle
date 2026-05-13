@@ -842,8 +842,19 @@ export const LEVELS: LevelData[] = [
     K('k1',5,5,3,'purple'),
     O('o1',9,4), O('o2',7,2), O('o3',2,7), O('o4',4,0), O('o5',6,0), O('o6',1,7), O('o7',8,8), O('o8',2,1), O('o9',7,7), O('o10',3,3), O('o11',1,9), O('o12',4,4), O('o13',4,6), O('o14',6,4), O('o15',6,6), O('o16',1,4), O('o17',1,6),
   ], [E('RIGHT',5)], 32, 'fixture', [[6,5],[5,3]]),
-  // L80 — final boss: ice push + lock counter combined, multi-exit
-  L(80, 9, 5, [SC('m1',0,1,'red'), SC('m2',0,3,'blue'), O('o1',3,1), O('o2',3,3), K('k1',0,0,2), K('k2',0,4,2)], [E('RIGHT',1), E('RIGHT',3), E('RIGHT',0), E('RIGHT',4)], 8, 'fixture', [[2,1],[2,3]]),`;
+  // L80 — final boss. Single exit. All mechanics. Par 38 target. Dep chain depth 4.
+  L(80, 10, 10, [
+    SC('m1',0,5,'red'),
+    D('m2',0,2,'m1'),
+    D('m3',0,8,'m2'),
+    D('m4',9,2,'m3'),
+    D('m5',3,5,'m4'),
+    K('k1',5,5,4,'purple'),
+    SC('m6',9,8,'blue'),
+    O('o1',9,4), O('o2',7,2), O('o3',2,7), O('o4',4,0), O('o5',6,0), O('o6',1,7), O('o7',8,8),
+    O('o8',2,1), O('o9',7,7), O('o10',3,3), O('o11',1,9), O('o12',4,4), O('o13',4,6),
+    O('o14',6,4), O('o15',6,6), O('o16',1,4), O('o17',1,6), O('o18',3,9),
+  ], [E('RIGHT',5)], 39, 'fixture', [[6,5],[5,3]]),`;
 
   const bakedSolutions = entries.map((e) => {
     const moves = e.solution.map((m) => `{blockId:'${m.blockId}',dir:'${m.dir}'}`).join(', ');
@@ -857,7 +868,7 @@ export const LEVELS: LevelData[] = [
   77: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
   78: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k2',dir:'RIGHT'}],
   79: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'UP'},{blockId:'m1',dir:'RIGHT'},{blockId:'m5',dir:'UP'},{blockId:'m5',dir:'LEFT'},{blockId:'m5',dir:'UP'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'DOWN'},{blockId:'m5',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'UP'},{blockId:'m2',dir:'RIGHT'},{blockId:'m3',dir:'RIGHT'},{blockId:'m3',dir:'DOWN'},{blockId:'m3',dir:'RIGHT'},{blockId:'m3',dir:'UP'},{blockId:'m3',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'m5',dir:'RIGHT'},{blockId:'m4',dir:'LEFT'},{blockId:'m4',dir:'DOWN'},{blockId:'m4',dir:'RIGHT'},{blockId:'m4',dir:'UP'},{blockId:'m4',dir:'RIGHT'}],
-  80: [],`;
+  80: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m6',dir:'DOWN'},{blockId:'m6',dir:'LEFT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'UP'},{blockId:'m6',dir:'RIGHT'},{blockId:'m6',dir:'UP'},{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m6',dir:'LEFT'},{blockId:'m6',dir:'UP'},{blockId:'m2',dir:'LEFT'},{blockId:'m2',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'UP'},{blockId:'m2',dir:'RIGHT'},{blockId:'m3',dir:'RIGHT'},{blockId:'m3',dir:'DOWN'},{blockId:'m3',dir:'RIGHT'},{blockId:'m3',dir:'UP'},{blockId:'m3',dir:'RIGHT'},{blockId:'m4',dir:'LEFT'},{blockId:'m4',dir:'DOWN'},{blockId:'m4',dir:'RIGHT'},{blockId:'m4',dir:'UP'},{blockId:'m4',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'m5',dir:'RIGHT'},{blockId:'m6',dir:'DOWN'},{blockId:'m6',dir:'RIGHT'},{blockId:'m6',dir:'UP'},{blockId:'m6',dir:'RIGHT'}],`;
 
   const solutionsBody = bakedSolutions + '\n' + fixtureSolutions;
 

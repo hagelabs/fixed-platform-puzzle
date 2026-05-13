@@ -116,14 +116,22 @@ export class Grid {
     g.fillStyle(TOKENS.white, 1);
     g.fillRoundedRect(bx + borderPx, by + borderPx, bw - borderPx * 2, bh - borderPx * 2, cornerR - 2);
 
-    const dots = scene.add.graphics();
-    this.createdObjects.push(dots);
-    dots.fillStyle(TOKENS.ink, 0.14);
-    const dotStep = Math.max(28, this.cellSize / 4);
-    for (let dy = this.originY + dotStep / 2; dy < this.originY + h; dy += dotStep) {
-      for (let dx = this.originX + dotStep / 2; dx < this.originX + w; dx += dotStep) {
-        dots.fillCircle(dx, dy, 2.5);
-      }
+    const lines = scene.add.graphics();
+    this.createdObjects.push(lines);
+    lines.lineStyle(2, TOKENS.ink, 0.18);
+    for (let r = 1; r < this.rows; r++) {
+      const y = this.originY + r * this.cellSize;
+      lines.beginPath();
+      lines.moveTo(this.originX, y);
+      lines.lineTo(this.originX + w, y);
+      lines.strokePath();
+    }
+    for (let c = 1; c < this.cols; c++) {
+      const x = this.originX + c * this.cellSize;
+      lines.beginPath();
+      lines.moveTo(x, this.originY);
+      lines.lineTo(x, this.originY + h);
+      lines.strokePath();
     }
   }
 

@@ -18,7 +18,7 @@ export const COLORS: Record<Color, number> = {
 };
 
 export const DRAG_THRESHOLD = 5;
-export const TOTAL_LEVELS = 126;
+export const TOTAL_LEVELS = 80;
 
 export const SCENE_KEYS = {
   Boot: "BootScene",

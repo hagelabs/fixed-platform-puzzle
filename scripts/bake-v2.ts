@@ -1,11 +1,19 @@
-// Bake 50 levels with v2 solver (slide momentum + constrained + dependent).
-// Verified-solvable levels with smooth difficulty curve. Outputs Levels.ts.
+// Bake levels with v2 solver (slide momentum + constrained + dependent).
+// Verified-solvable levels matching docs/LEVEL_DESIGN.md brief par targets.
+// Output: scripts/output/baked.json (intermediate store) + src/config/Levels.ts (final).
 //
-// Usage: npx tsx scripts/bake-v2.ts
+// Usage:
+//   npx tsx scripts/bake-v2.ts                         # bake all 72 baked levels
+//   npx tsx scripts/bake-v2.ts --pack=stones           # only stones pack
+//   npx tsx scripts/bake-v2.ts --ids=44-50             # specific id range
+//   npx tsx scripts/bake-v2.ts --ids=46,52,58          # specific ids
+//
+// Fixtures L73-80 stay inline (not regen-able via this script). Edit emit footer directly.
 
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LEVELS as EXISTING_LEVELS, SOLUTIONS as EXISTING_SOLUTIONS } from '../src/config/Levels';
 
 type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type ExitSide = 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT';
@@ -274,116 +282,111 @@ interface Phase {
   primarySide: ExitSide;
 }
 
-// PHASES generated programmatically — 4 packs × 30 levels = 120.
-// Tutorial (1-30): simple + constrained dominant, small grids
-// Gears (31-60): dependent intro + depth
-// Stones (61-90): obstacle-heavy
-// Master (91-120): mixed mastery
+// PHASES generated from docs/LEVEL_DESIGN.md brief — 72 baked levels matching brief par targets.
+// Pack layout:
+//   Tutorial L1-8 (8 baked)
+//   Hook L9-23 (15 baked)
+//   Gears L24-43 (20 baked)
+//   Stones L44-63 (20 baked)
+//   Master L64-72 (9 baked)
+// L73-78 = ice/lock fixtures (hand-authored, slot into Master pack)
+// L79-80 = final-boss fixtures (hand-authored)
 const SIDES_CYCLE: ExitSide[] = ['RIGHT', 'BOTTOM', 'LEFT', 'TOP'];
+
+// Brief par targets per level (positional). 72 entries (baked only).
+const PAR_TARGETS: number[] = [
+  // Tutorial L1-8
+  2, 3, 3, 4, 4, 5, 5, 6,
+  // Hook L9-23
+  7, 6, 8, 9, 7, 10, 8, 9, 11, 8, 10, 12, 9, 10, 12,
+  // Gears L24-43
+  10, 11, 12, 10, 13, 14, 11, 14, 12, 13, 15, 12, 14, 16, 13, 15, 17, 14, 16, 18,
+  // Stones L44-63
+  14, 15, 16, 14, 17, 16, 18, 15, 17, 19, 16, 18, 20, 17, 19, 20, 18, 21, 19, 22,
+  // Master L64-72 (rest of pack 73-78 = fixtures)
+  18, 19, 20, 18, 21, 20, 22, 19, 23,
+];
+
+function packOfIdx(idx: number): 'tutorial' | 'hook' | 'gears' | 'stones' | 'master' {
+  if (idx < 8) return 'tutorial';
+  if (idx < 23) return 'hook';
+  if (idx < 43) return 'gears';
+  if (idx < 63) return 'stones';
+  return 'master';
+}
+
+function inferPhase(idx: number, par: number, side: ExitSide): Phase {
+  const pack = packOfIdx(idx);
+  // Grid scales with par
+  let cols: number;
+  if (par <= 4) cols = 5;
+  else if (par <= 7) cols = 6;
+  else if (par <= 11) cols = 7;
+  else if (par <= 15) cols = 8;
+  else if (par <= 19) cols = 9;
+  else cols = 10;
+  const rows = cols;
+
+  let movables: number;
+  let yellows: number;
+  let deps: number;
+  let obstacles: number;
+  let depthMode: Phase['depthMode'];
+  let exits = 1;
+
+  if (pack === 'tutorial') {
+    // 1-3 movables, intro each mechanic
+    if (par <= 2) { movables = 1; yellows = 0; deps = 0; obstacles = 0; depthMode = 'none'; }
+    else if (par <= 3) { movables = 2; yellows = idx === 2 ? 1 : 0; deps = 0; obstacles = 0; depthMode = 'none'; }
+    else if (par <= 4) { movables = 2; yellows = 1; deps = idx >= 4 ? 1 : 0; obstacles = idx === 3 ? 1 : 0; depthMode = deps > 0 ? 'linear' : 'none'; }
+    else { movables = 3; yellows = 1; deps = 1; obstacles = 1; depthMode = 'linear'; }
+  } else if (pack === 'hook') {
+    // 3-4 movables, dependent showcase
+    movables = par <= 8 ? 3 : 4;
+    yellows = 1;
+    deps = par >= 9 ? 2 : 1;
+    obstacles = par >= 10 ? 2 : 1;
+    depthMode = deps >= 2 ? 'linear' : 'linear';
+  } else if (pack === 'gears') {
+    // chain depth 2-3, par 10-18
+    movables = par <= 12 ? 4 : 5;
+    yellows = 1;
+    deps = par <= 12 ? 2 : par <= 15 ? 2 : 3;
+    obstacles = par <= 13 ? 2 : 3;
+    depthMode = par >= 14 ? 'linear' : 'linear';
+  } else if (pack === 'stones') {
+    // obstacle-heavy, par 14-22
+    movables = par <= 17 ? 4 : 5;
+    yellows = 1;
+    deps = par <= 16 ? 1 : 2;
+    obstacles = par <= 16 ? 3 : par <= 19 ? 4 : 5;
+    depthMode = deps >= 2 ? 'mixed' : 'linear';
+    if (par >= 20) exits = 2;
+  } else {
+    // master (L64-72): mixed mastery, par 18-23
+    movables = 5;
+    yellows = 1;
+    deps = 3;
+    obstacles = 4;
+    depthMode = 'mixed';
+    if (par >= 21) exits = 2;
+  }
+
+  return {
+    cols, rows, movables, yellows, deps, obstacles, exits,
+    optMin: Math.max(1, par - 2),
+    optMax: par + 3,
+    depthMode,
+    primarySide: side,
+  };
+}
 
 function buildPhases(): Phase[] {
   const out: Phase[] = [];
-
-  // === Pack 1: Tutorial (L1-30) ===
-  for (let i = 0; i < 30; i++) {
-    const stage = Math.floor(i / 5); // 0..5
+  for (let i = 0; i < PAR_TARGETS.length; i++) {
     const side = SIDES_CYCLE[i % 4];
-    if (stage === 0) {
-      // 1 movable, no obstacles, intro each side
-      out.push({ cols: 6, rows: 6, movables: 1, yellows: i >= 2 ? 1 : 0, deps: 0, obstacles: 0, exits: 1, optMin: 1, optMax: 4, depthMode: 'none', primarySide: side });
-    } else if (stage === 1) {
-      // 1-2 movables, 1 obstacle
-      out.push({ cols: 6, rows: 6, movables: 1 + (i % 2), yellows: 1, deps: 0, obstacles: 1, exits: 1, optMin: 1, optMax: 5, depthMode: 'none', primarySide: side });
-    } else if (stage === 2) {
-      // 2 movables, 1 obstacle
-      out.push({ cols: 7, rows: 7, movables: 2, yellows: i % 2, deps: 0, obstacles: 1, exits: 1, optMin: 2, optMax: 6, depthMode: 'none', primarySide: side });
-    } else if (stage === 3) {
-      // 2-3 movables, 1-2 obstacles
-      out.push({ cols: 7, rows: 7, movables: 2 + (i % 2), yellows: 1, deps: 0, obstacles: 1 + (i % 2), exits: 1, optMin: 3, optMax: 7, depthMode: 'none', primarySide: side });
-    } else if (stage === 4) {
-      // 3 movables, 2 obstacles
-      out.push({ cols: 7, rows: 7, movables: 3, yellows: 1, deps: 0, obstacles: 2, exits: 1, optMin: 4, optMax: 8, depthMode: 'none', primarySide: side });
-    } else {
-      // 3 movables, mixed, intro 8x8
-      out.push({ cols: 8, rows: 8, movables: 3, yellows: i % 2, deps: 0, obstacles: 2, exits: 1, optMin: 4, optMax: 9, depthMode: 'none', primarySide: side });
-    }
+    out.push(inferPhase(i, PAR_TARGETS[i], side));
   }
-
-  // === Pack 2: Gears (L31-60) ===
-  for (let i = 0; i < 30; i++) {
-    const stage = Math.floor(i / 5);
-    const side = SIDES_CYCLE[i % 4];
-    if (stage === 0) {
-      // intro dependent — 2 movables 1 dep
-      out.push({ cols: 7, rows: 7, movables: 2, yellows: 0, deps: 1, obstacles: 1, exits: 1, optMin: 3, optMax: 8, depthMode: 'linear', primarySide: side });
-    } else if (stage === 1) {
-      // 3 movables, 1 dep, 2 obstacles
-      out.push({ cols: 8, rows: 8, movables: 3, yellows: i % 2, deps: 1, obstacles: 2, exits: 1, optMin: 5, optMax: 10, depthMode: 'linear', primarySide: side });
-    } else if (stage === 2) {
-      // 3 movables, 2 dep, depth 2
-      out.push({ cols: 8, rows: 8, movables: 3, yellows: 0, deps: 2, obstacles: 2, exits: 1, optMin: 6, optMax: 12, depthMode: 'linear', primarySide: side });
-    } else if (stage === 3) {
-      // 4 movables, 1-2 dep
-      out.push({ cols: 8, rows: 8, movables: 4, yellows: i % 2, deps: 1 + (i % 2), obstacles: 2, exits: 1, optMin: 7, optMax: 13, depthMode: 'linear', primarySide: side });
-    } else if (stage === 4) {
-      // 4 movables, 2 dep, branch mode
-      out.push({ cols: 9, rows: 9, movables: 4, yellows: 1, deps: 2, obstacles: 3, exits: 1, optMin: 8, optMax: 14, depthMode: i % 2 ? 'branch' : 'linear', primarySide: side });
-    } else {
-      // 4 movables, 2 dep mixed
-      out.push({ cols: 9, rows: 9, movables: 4, yellows: 1, deps: 2, obstacles: 3, exits: 1, optMin: 9, optMax: 15, depthMode: 'mixed', primarySide: side });
-    }
-  }
-
-  // === Pack 3: Stones (L61-90) — obstacle-heavy ===
-  for (let i = 0; i < 30; i++) {
-    const stage = Math.floor(i / 5);
-    const side = SIDES_CYCLE[i % 4];
-    if (stage === 0) {
-      // 3 movables 3 obstacles
-      out.push({ cols: 9, rows: 9, movables: 3, yellows: 1, deps: 0, obstacles: 3, exits: 1, optMin: 5, optMax: 12, depthMode: 'none', primarySide: side });
-    } else if (stage === 1) {
-      // 4 movables 3-4 obstacles
-      out.push({ cols: 9, rows: 9, movables: 4, yellows: i % 2, deps: 1, obstacles: 3 + (i % 2), exits: 1, optMin: 7, optMax: 13, depthMode: 'linear', primarySide: side });
-    } else if (stage === 2) {
-      // 4 movables 4 obstacles
-      out.push({ cols: 10, rows: 10, movables: 4, yellows: 1, deps: 1, obstacles: 4, exits: 1, optMin: 8, optMax: 14, depthMode: 'linear', primarySide: side });
-    } else if (stage === 3) {
-      // 5 movables 4 obstacles
-      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 4, exits: 1, optMin: 10, optMax: 16, depthMode: 'linear', primarySide: side });
-    } else if (stage === 4) {
-      // 5 movables 5 obstacles, dual exit intro
-      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 5, exits: i % 2 ? 2 : 1, optMin: 10, optMax: 17, depthMode: 'branch', primarySide: side });
-    } else {
-      // 5 movables 5 obstacles
-      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 5, exits: 1, optMin: 12, optMax: 18, depthMode: 'mixed', primarySide: side });
-    }
-  }
-
-  // === Pack 4: Master (L91-120) — mixed mastery ===
-  for (let i = 0; i < 30; i++) {
-    const stage = Math.floor(i / 5);
-    const side = SIDES_CYCLE[i % 4];
-    if (stage === 0) {
-      // 5 movables, 3 deps, branching
-      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 3, exits: 1, optMin: 12, optMax: 19, depthMode: 'branch', primarySide: side });
-    } else if (stage === 1) {
-      // 5 movables, 3 deps, mixed
-      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 4, exits: 1, optMin: 14, optMax: 21, depthMode: 'mixed', primarySide: side });
-    } else if (stage === 2) {
-      // 5 movables, dual exit, mixed
-      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 4, exits: 2, optMin: 13, optMax: 21, depthMode: 'mixed', primarySide: side });
-    } else if (stage === 3) {
-      // 5 movables, 4 deps
-      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 4, exits: 1, optMin: 15, optMax: 22, depthMode: 'linear', primarySide: side });
-    } else if (stage === 4) {
-      // 5 movables, 4 deps, mixed
-      out.push({ cols: 10, rows: 10, movables: 5, yellows: i % 2 ? 2 : 1, deps: 3, obstacles: 5, exits: i % 2 ? 2 : 1, optMin: 15, optMax: 23, depthMode: 'mixed', primarySide: side });
-    } else {
-      // legendary
-      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 5, exits: 2, optMin: 16, optMax: 24, depthMode: 'mixed', primarySide: side });
-    }
-  }
-
   return out;
 }
 
@@ -572,11 +575,131 @@ function levelSig(level: Level): string {
 
 interface BakedLevel { lvl: Level; opt: number; path: { blockId: string; dir: Direction }[]; }
 
-function bakeAll(): BakedLevel[] {
-  const out: BakedLevel[] = [];
-  const sigs = new Set<string>();
+// JSON store entry — persisted shape per level
+interface StoredLevel {
+  id: number;
+  cols: number;
+  rows: number;
+  blocks: BlockSpec[];
+  exits: { side: ExitSide; index: number }[];
+  parMoves: number;
+  pack: string;
+  solution: { blockId: string; dir: Direction }[];
+}
 
-  for (let id = 1; id <= TOTAL; id++) {
+const TOTAL_BAKED = 72;
+const PACK_RANGES: Record<string, [number, number]> = {
+  tutorial: [1, 8],
+  hook: [9, 23],
+  gears: [24, 43],
+  stones: [44, 63],
+  master: [64, 72], // baked-only master IDs (73-78 are fixtures)
+};
+
+function packOfId(id: number): string {
+  if (id <= 8) return 'tutorial';
+  if (id <= 23) return 'hook';
+  if (id <= 43) return 'gears';
+  if (id <= 63) return 'stones';
+  if (id <= 78) return 'master';
+  return 'fixture';
+}
+
+function parseArgs(): { ids: number[]; description: string } {
+  const args = process.argv.slice(2);
+  const ids = new Set<number>();
+  const labels: string[] = [];
+  for (const arg of args) {
+    if (arg.startsWith('--pack=')) {
+      const p = arg.slice(7);
+      const range = PACK_RANGES[p];
+      if (!range) {
+        console.error(`unknown pack '${p}'. Valid: ${Object.keys(PACK_RANGES).join(', ')}`);
+        process.exit(1);
+      }
+      for (let i = range[0]; i <= range[1]; i++) ids.add(i);
+      labels.push(`pack=${p}(${range[0]}..${range[1]})`);
+    } else if (arg.startsWith('--ids=')) {
+      const expr = arg.slice(6);
+      for (const part of expr.split(',')) {
+        const m = part.match(/^(\d+)(?:-(\d+))?$/);
+        if (!m) { console.error(`bad id range '${part}'`); process.exit(1); }
+        const lo = parseInt(m[1], 10);
+        const hi = m[2] ? parseInt(m[2], 10) : lo;
+        for (let i = lo; i <= hi; i++) ids.add(i);
+      }
+      labels.push(`ids=${expr}`);
+    } else if (arg === '--help' || arg === '-h') {
+      console.log('Usage: npx tsx scripts/bake-v2.ts [--pack=NAME] [--ids=A-B,C]');
+      console.log(`Packs: ${Object.entries(PACK_RANGES).map(([k, v]) => `${k}(${v[0]}..${v[1]})`).join(', ')}`);
+      process.exit(0);
+    } else {
+      console.error(`unknown arg '${arg}' (use --help)`);
+      process.exit(1);
+    }
+  }
+  // Validate: only baked-pack IDs allowed (1..TOTAL_BAKED)
+  for (const id of ids) {
+    if (id < 1 || id > TOTAL_BAKED) {
+      console.error(`id ${id} out of bake range (1..${TOTAL_BAKED}). Fixtures (73-80) are inline.`);
+      process.exit(1);
+    }
+  }
+  if (ids.size === 0) {
+    for (let i = 1; i <= TOTAL_BAKED; i++) ids.add(i);
+    labels.push(`all(1..${TOTAL_BAKED})`);
+  }
+  return { ids: [...ids].sort((a, b) => a - b), description: labels.join(' + ') };
+}
+
+const STORE_PATH_REL = 'scripts/output/baked.json';
+
+function loadStore(repoRoot: string): Map<number, StoredLevel> {
+  const store = new Map<number, StoredLevel>();
+  const full = resolve(repoRoot, STORE_PATH_REL);
+  if (!existsSync(full)) return store;
+  try {
+    const raw = JSON.parse(readFileSync(full, 'utf8'));
+    if (raw && raw.levels && typeof raw.levels === 'object') {
+      for (const [k, v] of Object.entries(raw.levels)) {
+        store.set(parseInt(k, 10), v as StoredLevel);
+      }
+    }
+  } catch (e) {
+    console.warn(`[store] failed to read ${STORE_PATH_REL}, starting fresh:`, (e as Error).message);
+  }
+  return store;
+}
+
+function saveStore(repoRoot: string, store: Map<number, StoredLevel>): void {
+  const full = resolve(repoRoot, STORE_PATH_REL);
+  mkdirSync(dirname(full), { recursive: true });
+  const sortedIds = [...store.keys()].sort((a, b) => a - b);
+  const obj: { version: number; updated: string; levels: Record<string, StoredLevel> } = {
+    version: 1,
+    updated: new Date().toISOString(),
+    levels: {},
+  };
+  for (const id of sortedIds) obj.levels[String(id)] = store.get(id)!;
+  writeFileSync(full, JSON.stringify(obj, null, 2) + '\n', 'utf8');
+}
+
+function bakedToStored(b: BakedLevel): StoredLevel {
+  return {
+    id: b.lvl.id,
+    cols: b.lvl.cols,
+    rows: b.lvl.rows,
+    blocks: b.lvl.blocks,
+    exits: b.lvl.exits,
+    parMoves: b.opt,
+    pack: packOfId(b.lvl.id),
+    solution: b.path,
+  };
+}
+
+function bakeIds(ids: number[], existingSigs: Set<string>): Map<number, BakedLevel> {
+  const out = new Map<number, BakedLevel>();
+  for (const id of ids) {
     const phase = getPhase(id);
     let chosen: BakedLevel | null = null;
     const passes: { maxAttempts: number; budget: number; depth: number; strict: boolean }[] = [
@@ -592,7 +715,7 @@ function bakeAll(): BakedLevel[] {
         const lvl = generateLevel(id, seed);
         if (!lvl) continue;
         const sig = levelSig(lvl);
-        if (sigs.has(sig)) continue;
+        if (existingSigs.has(sig)) continue;
         const r = solve(lvl, pass.budget, pass.depth);
         if (!r.solvable) continue;
         if (pass.strict && (r.optimal < phase.optMin || r.optimal > phase.optMax)) continue;
@@ -605,11 +728,11 @@ function bakeAll(): BakedLevel[] {
       console.error(`L${id}: failed bake`);
       process.exit(1);
     }
-    sigs.add(levelSig(chosen.lvl));
-    out.push(chosen);
+    existingSigs.add(levelSig(chosen.lvl));
+    out.set(id, chosen);
     const inBand = chosen.opt >= phase.optMin && chosen.opt <= phase.optMax ? '✓' : '~';
     console.log(
-      `L${String(id).padStart(2)} (${phase.cols}x${phase.rows}, ${chosen.lvl.exits.length}ex, ${chosen.lvl.blocks.length}b): opt=${chosen.opt} band=[${phase.optMin}-${phase.optMax}] ${inBand} path=${chosen.path.length}`
+      `L${String(id).padStart(3)} (${phase.cols}x${phase.rows}, ${chosen.lvl.exits.length}ex, ${chosen.lvl.blocks.length}b): opt=${chosen.opt} band=[${phase.optMin}-${phase.optMax}] ${inBand} path=${chosen.path.length}`
     );
   }
   return out;
@@ -619,7 +742,7 @@ function bakeAll(): BakedLevel[] {
 // Emit Levels.ts
 // ============================================================
 
-function emitLevelsTs(baked: BakedLevel[]): string {
+function emitLevelsTs(entries: StoredLevel[]): string {
   const header = `import { LevelData, BlockData, Color, ExitZone, Direction } from '../types/Game';
 
 const S = (id: string, c: number, r: number): BlockData => ({
@@ -656,51 +779,52 @@ const L = (
 export const LEVELS: LevelData[] = [
 `;
 
-  const packOf = (id: number): string => {
-    if (id <= 30) return 'tutorial';
-    if (id <= 60) return 'gears';
-    if (id <= 90) return 'stones';
-    return 'master';
-  };
-
-  const body = baked.map(({ lvl, opt }) => {
-    const blocksStr = lvl.blocks.map((b) => {
+  const body = entries.map((e) => {
+    const blocksStr = e.blocks.map((b) => {
       if (b.type === 'simple') return `S('${b.id}',${b.pos[0]},${b.pos[1]})`;
       if (b.type === 'obstacle') return `O('${b.id}',${b.pos[0]},${b.pos[1]})`;
       if (b.type === 'constrained') return `C('${b.id}',${b.pos[0]},${b.pos[1]},'${b.direction}')`;
       return `D('${b.id}',${b.pos[0]},${b.pos[1]},'${b.dependsOn}')`;
     }).join(', ');
-    const exitsStr = lvl.exits.map((e) => `E('${e.side}',${e.index})`).join(', ');
-    return `  L(${lvl.id}, ${lvl.cols}, ${lvl.rows}, [${blocksStr}], [${exitsStr}], ${opt}, '${packOf(lvl.id)}'),`;
+    const exitsStr = e.exits.map((x) => `E('${x.side}',${x.index})`).join(', ');
+    return `  L(${e.id}, ${e.cols}, ${e.rows}, [${blocksStr}], [${exitsStr}], ${e.parMoves}, '${e.pack}'),`;
   }).join('\n');
 
-  // Fixture levels — hand-authored to showcase ice (push) + lock (counter) mechanics. Appended to master pack.
+  // Fixture levels — hand-authored. Slot into Master pack (L73-78) for ice/lock intros,
+  // plus Fixture pack (L79-80) for legendary finale.
   const fixtures = `
-  // === FIXTURE LEVELS (hand-authored: ice push + lock counter mechanics) ===
-  // L121 — ice push intro: skip 1 obstacle
-  L(121, 5, 3, [SC('m1',0,1,'red'), O('o1',2,1)], [E('RIGHT',1)], 2, 'master', [[1,1]]),
-  // L122 — chain push through two obstacles
-  L(122, 7, 3, [SC('m1',0,1,'red'), O('o1',2,1), O('o2',4,1)], [E('RIGHT',1)], 2, 'master', [[1,1],[3,1]]),
-  // L123 — parallel ice paths, 2 simples
-  L(123, 6, 4, [SC('m1',0,1,'red'), SC('m2',0,2,'blue'), O('o1',3,1), O('o2',3,2)], [E('RIGHT',1), E('RIGHT',2)], 4, 'master', [[2,1],[2,2]]),
-  // L124 — lock counter intro: unlockAt 1
-  L(124, 6, 2, [SC('m1',0,0,'red'), K('k1',0,1,1)], [E('RIGHT',0), E('RIGHT',1)], 2, 'master'),
-  // L125 — lock unlockAt 2 (need 2 exits first)
-  L(125, 7, 3, [SC('m1',0,0,'red'), SC('m2',0,1,'blue'), K('k1',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
-  // L126 — two locks, staggered unlock (1 and 2)
-  L(126, 8, 3, [SC('m1',0,0,'red'), K('k1',0,1,1), K('k2',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),`;
+  // === MASTER PACK FIXTURES (L73-78): ice push + lock counter intros ===
+  // L73 — ice push intro: skip 1 obstacle
+  L(73, 5, 3, [SC('m1',0,1,'red'), O('o1',2,1)], [E('RIGHT',1)], 2, 'master', [[1,1]]),
+  // L74 — chain push through two obstacles
+  L(74, 7, 3, [SC('m1',0,1,'red'), O('o1',2,1), O('o2',4,1)], [E('RIGHT',1)], 2, 'master', [[1,1],[3,1]]),
+  // L75 — parallel ice paths, 2 simples
+  L(75, 6, 4, [SC('m1',0,1,'red'), SC('m2',0,2,'blue'), O('o1',3,1), O('o2',3,2)], [E('RIGHT',1), E('RIGHT',2)], 4, 'master', [[2,1],[2,2]]),
+  // L76 — lock counter intro: unlockAt 1
+  L(76, 6, 2, [SC('m1',0,0,'red'), K('k1',0,1,1)], [E('RIGHT',0), E('RIGHT',1)], 2, 'master'),
+  // L77 — lock unlockAt 2 (need 2 exits first)
+  L(77, 7, 3, [SC('m1',0,0,'red'), SC('m2',0,1,'blue'), K('k1',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
+  // L78 — two locks, staggered unlock (1 and 2)
+  L(78, 8, 3, [SC('m1',0,0,'red'), K('k1',0,1,1), K('k2',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
+  // === FIXTURE PACK (L79-80): legendary finale combining all mechanics ===
+  // L79 — penultimate: ice + dependent + obstacles
+  L(79, 8, 5, [SC('m1',0,2,'red'), O('o1',3,2), O('o2',5,1), O('o3',5,3), SC('m2',0,4,'blue'), D('m3',0,0,'m1')], [E('RIGHT',2), E('RIGHT',4), E('TOP',0)], 7, 'fixture', [[2,2],[4,2]]),
+  // L80 — final boss: ice push + lock counter combined, multi-exit
+  L(80, 9, 5, [SC('m1',0,1,'red'), SC('m2',0,3,'blue'), O('o1',3,1), O('o2',3,3), K('k1',0,0,2), K('k2',0,4,2)], [E('RIGHT',1), E('RIGHT',3), E('RIGHT',0), E('RIGHT',4)], 8, 'fixture', [[2,1],[2,3]]),`;
 
-  const bakedSolutions = baked.map(({ lvl, path }) => {
-    const moves = path.map((m) => `{blockId:'${m.blockId}',dir:'${m.dir}'}`).join(', ');
-    return `  ${lvl.id}: [${moves}],`;
+  const bakedSolutions = entries.map((e) => {
+    const moves = e.solution.map((m) => `{blockId:'${m.blockId}',dir:'${m.dir}'}`).join(', ');
+    return `  ${e.id}: [${moves}],`;
   }).join('\n');
 
-  const fixtureSolutions = `  121: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
-  122: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
-  123: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'}],
-  124: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
-  125: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
-  126: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k2',dir:'RIGHT'}],`;
+  const fixtureSolutions = `  73: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
+  74: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
+  75: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'}],
+  76: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
+  77: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
+  78: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k2',dir:'RIGHT'}],
+  79: [],
+  80: [],`;
 
   const solutionsBody = bakedSolutions + '\n' + fixtureSolutions;
 
@@ -733,13 +857,15 @@ export interface WorldPack {
 }
 
 export const PACKS: WorldPack[] = [
-  { id: 'tutorial', name: 'Tutorial',  theme: 'intro',     levelIds: LEVELS.filter(l => l.pack === 'tutorial').map(l => l.id), unlockAfter: 0 },
-  { id: 'gears',    name: 'Gears',     theme: 'dependent', levelIds: LEVELS.filter(l => l.pack === 'gears').map(l => l.id),    unlockAfter: 25 },
-  { id: 'stones',   name: 'Stones',    theme: 'obstacle',  levelIds: LEVELS.filter(l => l.pack === 'stones').map(l => l.id),   unlockAfter: 55 },
-  { id: 'master',   name: 'Master',    theme: 'mixed',     levelIds: LEVELS.filter(l => l.pack === 'master').map(l => l.id),   unlockAfter: 85 },
+  { id: 'tutorial', name: 'Tutorial', theme: 'intro',     levelIds: LEVELS.filter(l => l.pack === 'tutorial').map(l => l.id), unlockAfter: 0 },
+  { id: 'hook',     name: 'Hook',     theme: 'wow',       levelIds: LEVELS.filter(l => l.pack === 'hook').map(l => l.id),     unlockAfter: 6 },
+  { id: 'gears',    name: 'Gears',    theme: 'dependent', levelIds: LEVELS.filter(l => l.pack === 'gears').map(l => l.id),    unlockAfter: 20 },
+  { id: 'stones',   name: 'Stones',   theme: 'obstacle',  levelIds: LEVELS.filter(l => l.pack === 'stones').map(l => l.id),   unlockAfter: 40 },
+  { id: 'master',   name: 'Master',   theme: 'mixed',     levelIds: LEVELS.filter(l => l.pack === 'master').map(l => l.id),   unlockAfter: 60 },
+  { id: 'fixture',  name: 'Finale',   theme: 'boss',      levelIds: LEVELS.filter(l => l.pack === 'fixture').map(l => l.id),  unlockAfter: 75 },
 ];
 
-export const FIXTURE_IDS = LEVELS.filter((l) => l.id >= 121).map((l) => l.id);
+export const FIXTURE_IDS = LEVELS.filter((l) => l.id >= 73).map((l) => l.id);
 
 export function getPackOf(levelId: number): WorldPack | undefined {
   return PACKS.find((p) => p.levelIds.includes(levelId));
@@ -760,15 +886,79 @@ export function starsFor(parMoves: number, moves: number): 1 | 2 | 3 {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const REPO_ROOT = resolve(__dirname, '..');
 
-console.log(`Baking ${TOTAL} levels (v2 solver)...`);
+// Parse CLI args + determine target IDs
+const { ids: targetIds, description: targetDesc } = parseArgs();
+console.log(`Bake target: ${targetDesc} (${targetIds.length} levels)`);
+
+// Load existing store
+const store = loadStore(REPO_ROOT);
+console.log(`Store: loaded ${store.size} existing baked entries`);
+
+// Bootstrap: seed from existing Levels.ts on first run (covers IDs missing in store).
+let seeded = 0;
+for (const lvl of EXISTING_LEVELS) {
+  if (lvl.id > TOTAL_BAKED) continue;
+  if (store.has(lvl.id)) continue;
+  const blocks: BlockSpec[] = lvl.blocks.map((b) => ({
+    id: b.id,
+    type: (b.type ?? 'simple') as BlockType,
+    pos: b.position as [number, number],
+    direction: b.direction,
+    dependsOn: b.dependsOn,
+  }));
+  store.set(lvl.id, {
+    id: lvl.id,
+    cols: lvl.cols,
+    rows: lvl.rows,
+    blocks,
+    exits: lvl.exits.map((e) => ({ side: e.side as ExitSide, index: e.index })),
+    parMoves: lvl.parMoves,
+    pack: lvl.pack ?? packOfId(lvl.id),
+    solution: (EXISTING_SOLUTIONS[lvl.id] ?? []).map((m) => ({ blockId: m.blockId, dir: m.dir as Direction })),
+  });
+  seeded++;
+}
+if (seeded > 0) console.log(`Store: seeded ${seeded} entries from existing Levels.ts`);
+
+// Collect existing signatures (skip those being re-baked)
+const existingSigs = new Set<string>();
+for (const [id, entry] of store) {
+  if (targetIds.includes(id)) continue; // will be re-baked, don't lock signature
+  const sig = `${entry.cols}x${entry.rows}#`
+    + [...entry.blocks].map((b) => `${b.type}@${b.pos[0]},${b.pos[1]}|${b.direction ?? ''}|${b.dependsOn ?? ''}`).sort().join(';')
+    + `#${[...entry.exits].map((e) => `${e.side}@${e.index}`).sort().join(';')}`;
+  existingSigs.add(sig);
+}
+
 const t0 = Date.now();
-const levels = bakeAll();
+const baked = bakeIds(targetIds, existingSigs);
 const dt = ((Date.now() - t0) / 1000).toFixed(1);
 console.log(`---`);
-console.log(`Baked ${levels.length} levels in ${dt}s`);
+console.log(`Baked ${baked.size} levels in ${dt}s`);
 
-const out = emitLevelsTs(levels);
-const outPath = resolve(__dirname, '..', 'src', 'config', 'Levels.ts');
+// Merge baked into store
+for (const [id, b] of baked) {
+  store.set(id, bakedToStored(b));
+}
+
+// Save store
+saveStore(REPO_ROOT, store);
+console.log(`Store: saved ${store.size} entries → ${STORE_PATH_REL}`);
+
+// Verify completeness for emit (must have all baked IDs 1..TOTAL_BAKED)
+const missing: number[] = [];
+for (let i = 1; i <= TOTAL_BAKED; i++) if (!store.has(i)) missing.push(i);
+if (missing.length > 0) {
+  console.error(`Cannot emit Levels.ts — store missing IDs: ${missing.join(', ')}`);
+  console.error(`Run full bake first: npx tsx scripts/bake-v2.ts`);
+  process.exit(1);
+}
+
+// Emit Levels.ts from store (sorted by id)
+const sortedEntries = [...store.values()].sort((a, b) => a.id - b.id);
+const out = emitLevelsTs(sortedEntries);
+const outPath = resolve(REPO_ROOT, 'src', 'config', 'Levels.ts');
 writeFileSync(outPath, out, 'utf8');
 console.log(`Wrote ${outPath}`);

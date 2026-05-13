@@ -100,8 +100,8 @@ export class LevelSelectScene extends Phaser.Scene {
 
   private drawPackTabs(x: number, startY: number): void {
     const tabW = 340;
-    const tabH = 130;
-    const gap = 26;
+    const tabH = 100;
+    const gap = 20;
     const store = useGameStore.getState();
 
     PACKS.forEach((pack, i) => {
@@ -126,10 +126,10 @@ export class LevelSelectScene extends Phaser.Scene {
           AudioManager.uiTap();
           this.scene.start(SCENE_KEYS.LevelSelect, { activePackId: pack.id });
         },
-        { textSize: 28 },
+        { textSize: 24 },
       );
       if (!packUnlocked) btn.setEnabled(false);
-      slideUpIn(this, btn.container, 160 + i * 60);
+      slideUpIn(this, btn.container, 160 + i * 50);
     });
   }
 

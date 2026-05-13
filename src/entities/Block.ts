@@ -1,11 +1,9 @@
 import Phaser from 'phaser';
 import { BlockData, Color, BlockType, ExitSide, Direction } from '../types/Game';
-import { COLORS } from '../config/Constants';
 import { TOKENS } from '../ui/Theme';
 import { Grid } from './Grid';
 import { AudioManager } from '../managers/AudioManager';
-import { useGameStore } from '../managers/GameStateManager';
-import { drawSkinOverlay, SkinId } from '../config/Skins';
+import { getEquippedPalette } from '../config/Palettes';
 
 export class Block extends Phaser.GameObjects.Container {
   public readonly blockId: string;
@@ -77,10 +75,11 @@ export class Block extends Phaser.GameObjects.Container {
   }
 
   private fillColor(): number {
+    const p = getEquippedPalette();
     if (this.type === 'obstacle') return TOKENS.obstacleGray;
-    if (this.type === 'constrained') return TOKENS.yellow;
-    if (this.type === 'dependent') return TOKENS.blue;
-    return COLORS[this.color];
+    if (this.type === 'constrained') return p.ui.accent;
+    if (this.type === 'dependent') return p.ui.secondary;
+    return p.colors[this.color];
   }
 
   public refreshLock(grid: Grid): void {
@@ -142,13 +141,6 @@ export class Block extends Phaser.GameObjects.Container {
       }
     }
 
-    // Apply equipped skin overlay to simple movable blocks only
-    if (this.type === 'simple') {
-      const skinId = (useGameStore.getState().equippedSkin as SkinId) ?? 'default';
-      const inner = w - borderPx * 2;
-      const innerH = h - borderPx * 2;
-      drawSkinOverlay(g, skinId, inner, innerH, Math.max(0, cornerR - borderPx / 2), fill);
-    }
   }
 
   private drawIcon(): void {

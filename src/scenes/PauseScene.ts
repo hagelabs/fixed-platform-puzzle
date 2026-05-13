@@ -4,6 +4,7 @@ import { useGameStore } from '../managers/GameStateManager';
 import { showConfirm } from '../utils/Confirm';
 import { TOKENS, FONT_NEO, neoButton } from '../ui/Theme';
 import { AudioManager } from '../managers/AudioManager';
+import { paletteUI } from '../config/Palettes';
 
 export class PauseScene extends Phaser.Scene {
   constructor() {
@@ -16,7 +17,8 @@ export class PauseScene extends Phaser.Scene {
     const cx = width / 2;
     const cy = height / 2;
 
-    this.add.rectangle(cx, cy, width, height, TOKENS.cream, 0.92);
+    const ui = paletteUI();
+    this.add.rectangle(cx, cy, width, height, ui.bg, 0.92);
 
     this.add
       .text(cx, cy - 288, 'PAUSED', {
@@ -26,7 +28,7 @@ export class PauseScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    neoButton(this, cx, cy - 126, 504, 108, 'RESUME', TOKENS.mint, () => {
+    neoButton(this, cx, cy - 126, 504, 108, 'RESUME', ui.primary, () => {
       AudioManager.resumeSwoosh();
       this.scene.resume(SCENE_KEYS.Game);
       this.scene.stop();
@@ -35,7 +37,7 @@ export class PauseScene extends Phaser.Scene {
     const audioLabel = () =>
       `SOUND: ${useGameStore.getState().sfxEnabled ? 'ON' : 'OFF'}`;
     const audioBtn = neoButton(
-      this, cx, cy + 10, 504, 108, audioLabel(), TOKENS.sky,
+      this, cx, cy + 10, 504, 108, audioLabel(), ui.secondary,
       () => {
         useGameStore.getState().toggleAudio();
         audioBtn.setLabel(audioLabel());
@@ -43,7 +45,7 @@ export class PauseScene extends Phaser.Scene {
       },
     );
 
-    neoButton(this, cx, cy + 148, 504, 108, 'RESTART', TOKENS.yellow, () => {
+    neoButton(this, cx, cy + 148, 504, 108, 'RESTART', ui.accent, () => {
       AudioManager.uiTap();
       showConfirm(this, {
         title: 'RESTART LEVEL?',
@@ -58,7 +60,7 @@ export class PauseScene extends Phaser.Scene {
       });
     });
 
-    neoButton(this, cx, cy + 284, 504, 108, 'MAIN MENU', TOKENS.danger, () => {
+    neoButton(this, cx, cy + 284, 504, 108, 'MAIN MENU', ui.danger, () => {
       AudioManager.uiTap();
       AudioManager.stopAmbient();
       this.scene.stop(SCENE_KEYS.Game);

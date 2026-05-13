@@ -1,11 +1,9 @@
 import Phaser from 'phaser';
 import { SCENE_KEYS } from '../config/Constants';
-import { useGameStore, todayISO } from '../managers/GameStateManager';
+import { useGameStore } from '../managers/GameStateManager';
 import { AudioManager } from '../managers/AudioManager';
 import { fadeIn, fadeOutAndStart, dustPuff } from '../utils/Effects';
 import { showConfirm } from '../utils/Confirm';
-import { pickDailyLevel } from '../utils/Daily';
-import { Analytics } from '../managers/AnalyticsManager';
 import {
   TOKENS,
   FONT_NEO,
@@ -18,6 +16,7 @@ import {
   idlePulse,
 } from '../ui/Theme';
 import { Direction } from '../types/Game';
+import { paletteUI } from '../config/Palettes';
 
 interface DemoBlock {
   container: Phaser.GameObjects.Container;
@@ -75,7 +74,8 @@ export class MenuScene extends Phaser.Scene {
 
     const store = useGameStore.getState();
 
-    const playBtn = neoButton(this, cx, 460, 500, 116, 'PLAY', TOKENS.mint, () => {
+    const ui = paletteUI();
+    const playBtn = neoButton(this, cx, 460, 500, 116, 'PLAY', ui.primary, () => {
       AudioManager.uiTap();
       useGameStore.getState().setCurrentLevel(store.unlockedLevel);
       this.cleanupDemo();
@@ -83,63 +83,36 @@ export class MenuScene extends Phaser.Scene {
     });
     slideUpIn(this, playBtn.container, 280);
 
-    const lsBtn = neoButton(this, cx, 600, 500, 116, 'LEVEL SELECT', TOKENS.sky, () => {
+    const lsBtn = neoButton(this, cx, 600, 500, 116, 'LEVEL SELECT', ui.secondary, () => {
       AudioManager.uiTap();
       this.cleanupDemo();
       fadeOutAndStart(this, SCENE_KEYS.LevelSelect);
     });
     slideUpIn(this, lsBtn.container, 360);
 
-    const dailyDone = store.isDailyDoneToday();
-    const dailyLabel = dailyDone ? 'DAILY · DONE' : 'DAILY CHALLENGE';
-    const dailyBtn = neoButton(
-      this,
-      cx,
-      740,
-      500,
-      96,
-      dailyLabel,
-      dailyDone ? TOKENS.lockGray : TOKENS.yellow,
-      () => {
-        if (useGameStore.getState().isDailyDoneToday()) return;
-        AudioManager.uiTap();
-        const date = todayISO();
-        const levelId = pickDailyLevel(date);
-        Analytics.track('daily_started', { date, levelId });
-        useGameStore.getState().startDaily(levelId);
-        this.cleanupDemo();
-        fadeOutAndStart(this, SCENE_KEYS.Game);
-      },
-      { textSize: 30 },
-    );
-    if (dailyDone) dailyBtn.setEnabled(false);
-    slideUpIn(this, dailyBtn.container, 420);
-
-    this.drawStreakBadge(140, 70, store.streak);
-
-    const skinsBtn = neoPill(
+    const paletteBtn = neoPill(
       this,
       width - 430,
       70,
-      'SKINS',
+      'PALETTE',
       () => {
         AudioManager.uiTap();
         this.cleanupDemo();
         fadeOutAndStart(this, SCENE_KEYS.Cosmetics);
       },
-      { w: 200, h: 72, fill: TOKENS.white, textSize: 26 },
+      { w: 240, h: 72, fill: TOKENS.white, textSize: 26 },
     );
-    slideUpIn(this, skinsBtn.container, 140, -30);
+    slideUpIn(this, paletteBtn.container, 140, -30);
 
     if (store.unlockedLevel > 1) {
       const resetBtn = neoButton(
         this,
         cx,
-        860,
+        740,
         360,
         86,
         'RESET',
-        TOKENS.danger,
+        ui.danger,
         () => {
           AudioManager.uiTap();
           showConfirm(this, {
@@ -155,7 +128,7 @@ export class MenuScene extends Phaser.Scene {
         },
         { textSize: 32 },
       );
-      slideUpIn(this, resetBtn.container, 500);
+      slideUpIn(this, resetBtn.container, 440);
     }
 
     const audioLabel = () =>
@@ -188,39 +161,6 @@ export class MenuScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.off('pointerdown', this.onPointerDown, this);
       this.cleanupDemo();
-    });
-  }
-
-  private drawStreakBadge(x: number, y: number, streak: number): void {
-    if (streak <= 0) return;
-    const c = this.add.container(x, y);
-    const w = 180;
-    const h = 84;
-    const shadow = this.add.graphics();
-    shadow.fillStyle(TOKENS.ink, 1);
-    shadow.fillRoundedRect(-w / 2 + 4, -h / 2 + 4, w, h, 14);
-    const pill = this.add.graphics();
-    pill.fillStyle(TOKENS.ink, 1);
-    pill.fillRoundedRect(-w / 2, -h / 2, w, h, 14);
-    pill.fillStyle(0xFF9F1C, 1);
-    pill.fillRoundedRect(-w / 2 + 4, -h / 2 + 4, w - 8, h - 8, 12);
-    const flame = this.add
-      .text(-w / 2 + 22, 0, '🔥', { fontFamily: FONT_NEO, fontSize: '42px' })
-      .setOrigin(0, 0.5);
-    const num = this.add
-      .text(w / 2 - 18, 0, `${streak}`, { fontFamily: FONT_NEO, fontSize: '40px', color: TOKENS.inkHex })
-      .setOrigin(1, 0.5);
-    c.add([shadow, pill, flame, num]);
-    c.setAlpha(0);
-    this.tweens.add({ targets: c, alpha: 1, duration: 320, delay: 160, ease: 'Sine.easeOut' });
-    this.tweens.add({
-      targets: flame,
-      scale: { from: 1, to: 1.12 },
-      duration: 700,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-      delay: 600,
     });
   }
 

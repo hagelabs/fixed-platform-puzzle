@@ -4,10 +4,10 @@ import { useGameStore } from '../managers/GameStateManager';
 import { AdManager } from '../managers/AdManager';
 import { confetti, fadeIn, fadeOutAndStart } from '../utils/Effects';
 import { TOKENS, FONT_NEO, neoButton, dottedBackground, popIn, slideUpIn } from '../ui/Theme';
+import { paletteUI } from '../config/Palettes';
 import { getRandomQuote } from '../config/Quotes';
 import { getLevel, starsFor } from '../config/Levels';
 import { Analytics } from '../managers/AnalyticsManager';
-import { todayISO } from '../managers/GameStateManager';
 
 interface GameOverData {
   result: 'WIN' | 'STUCK';
@@ -37,8 +37,7 @@ export class GameOverScene extends Phaser.Scene {
     const { width } = this.scale;
     const cx = width / 2;
     const store = useGameStore.getState();
-    const isDaily = store.dailyMode;
-    const isLast = !isDaily && store.currentLevel >= TOTAL_LEVELS;
+    const isLast = store.currentLevel >= TOTAL_LEVELS;
 
     const level = getLevel(store.currentLevel);
     const par = level.parMoves;
@@ -47,21 +46,8 @@ export class GameOverScene extends Phaser.Scene {
     store.recordStars(store.currentLevel, stars);
     Analytics.track('star_earned', { levelId: store.currentLevel, stars, par, moves: store.movesThisLevel });
 
-    const streakResult = store.tickStreakOnWin();
-    if (streakResult.milestone) {
-      Analytics.track('streak_milestone', { streak: streakResult.streak });
-    }
-
-    if (isDaily) {
-      const date = todayISO();
-      store.recordDailyResult(date, true, stars);
-      Analytics.track('daily_completed', { date, levelId: store.currentLevel, stars });
-      store.endDaily();
-    }
-
-    const headLabel = isDaily ? 'DAILY DONE!' : 'CLEARED!';
     const headTxt = this.add
-      .text(cx, 180, headLabel, {
+      .text(cx, 180, 'CLEARED!', {
         fontFamily: FONT_NEO,
         fontSize: '94px',
         color: TOKENS.inkHex,
@@ -69,9 +55,8 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
     popIn(this, headTxt, 0);
 
-    const lvlLabel = isDaily ? `DAILY · ${store.movesThisLevel} MOVES · PAR ${par}` : `LEVEL ${store.currentLevel} · ${store.movesThisLevel} MOVES · PAR ${par}`;
     const subTxt = this.add
-      .text(cx, 282, lvlLabel, {
+      .text(cx, 282, `LEVEL ${store.currentLevel} · ${store.movesThisLevel} MOVES · PAR ${par}`, {
         fontFamily: FONT_NEO,
         fontSize: '32px',
         color: TOKENS.inkHex,
@@ -81,37 +66,14 @@ export class GameOverScene extends Phaser.Scene {
 
     this.drawStarRow(cx, 380, stars, prevBest);
 
-    if (streakResult.streak >= 2) {
-      const streakTxt = this.add
-        .text(cx, 470, `🔥 STREAK ${streakResult.streak}${streakResult.milestone ? ' · MILESTONE!' : ''}`, {
-          fontFamily: FONT_NEO,
-          fontSize: '34px',
-          color: TOKENS.inkHex,
-        })
-        .setOrigin(0.5);
-      this.fadeTextIn(streakTxt, 700, streakResult.milestone ? 1 : 0.85);
-    }
-
     this.drawQuotePanel(560, 680, 820, 460);
 
     const btnX = 1340;
     const btnW = 460;
     const btnH = 120;
 
-    if (isDaily) {
-      const menuBtn = neoButton(this, btnX, 620, btnW, btnH, 'MAIN MENU', TOKENS.sky, () => {
-        fadeOutAndStart(this, SCENE_KEYS.Menu);
-      });
-      slideUpIn(this, menuBtn.container, 380);
-      const doneTxt = this.add
-        .text(btnX, 790, 'COME BACK TOMORROW', {
-          fontFamily: FONT_NEO,
-          fontSize: '28px',
-          color: TOKENS.inkHex,
-        })
-        .setOrigin(0.5);
-      this.fadeTextIn(doneTxt, 520, 0.65);
-    } else if (isLast) {
+    const ui = paletteUI();
+    if (isLast) {
       const doneTxt = this.add
         .text(btnX, 540, 'ALL LEVELS DONE', {
           fontFamily: FONT_NEO,
@@ -120,23 +82,23 @@ export class GameOverScene extends Phaser.Scene {
         })
         .setOrigin(0.5);
       this.fadeTextIn(doneTxt, 380);
-      const menuBtn = neoButton(this, btnX, 710, btnW, btnH, 'MAIN MENU', TOKENS.danger, () => {
+      const menuBtn = neoButton(this, btnX, 710, btnW, btnH, 'MAIN MENU', ui.danger, () => {
         fadeOutAndStart(this, SCENE_KEYS.Menu);
       });
       slideUpIn(this, menuBtn.container, 480);
     } else {
-      const resumeBtn = neoButton(this, btnX, 560, btnW, btnH, 'RESUME', TOKENS.mint, () => {
+      const resumeBtn = neoButton(this, btnX, 560, btnW, btnH, 'RESUME', ui.primary, () => {
         useGameStore.getState().setCurrentLevel(useGameStore.getState().currentLevel + 1);
         fadeOutAndStart(this, SCENE_KEYS.Game);
       });
       slideUpIn(this, resumeBtn.container, 380);
 
-      const restartBtn = neoButton(this, btnX, 710, btnW, btnH, 'RESTART', TOKENS.yellow, () => {
+      const restartBtn = neoButton(this, btnX, 710, btnW, btnH, 'RESTART', ui.accent, () => {
         fadeOutAndStart(this, SCENE_KEYS.Game);
       });
       slideUpIn(this, restartBtn.container, 480);
 
-      const menuBtn = neoButton(this, btnX, 860, btnW, btnH, 'MAIN MENU', TOKENS.danger, () => {
+      const menuBtn = neoButton(this, btnX, 860, btnW, btnH, 'MAIN MENU', ui.danger, () => {
         fadeOutAndStart(this, SCENE_KEYS.Menu);
       });
       slideUpIn(this, menuBtn.container, 580);
@@ -279,7 +241,8 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     let busy = false;
-    neoButton(this, cx, cy + 18, 504, 108, 'CONTINUE (AD)', TOKENS.sky, async () => {
+    const ui = paletteUI();
+    neoButton(this, cx, cy + 18, 504, 108, 'CONTINUE (AD)', ui.secondary, async () => {
       if (busy) return;
       busy = true;
       try {
@@ -290,12 +253,11 @@ export class GameOverScene extends Phaser.Scene {
       }
     });
 
-    neoButton(this, cx, cy + 154, 504, 108, 'RETRY', TOKENS.yellow, () => {
+    neoButton(this, cx, cy + 154, 504, 108, 'RETRY', ui.accent, () => {
       fadeOutAndStart(this, SCENE_KEYS.Game);
     });
 
-    neoButton(this, cx, cy + 290, 504, 108, 'MAIN MENU', TOKENS.danger, () => {
-      if (useGameStore.getState().dailyMode) useGameStore.getState().endDaily();
+    neoButton(this, cx, cy + 290, 504, 108, 'MAIN MENU', ui.danger, () => {
       fadeOutAndStart(this, SCENE_KEYS.Menu);
     });
   }

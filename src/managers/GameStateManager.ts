@@ -7,19 +7,6 @@ const DEV = typeof __DEV__ !== 'undefined' && __DEV__;
 
 export const WATCH_COOLDOWN_MS = 3 * 60 * 1000;
 
-export function todayISO(d = new Date()): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
-}
-
-function isYesterday(last: string, today: string): boolean {
-  const d = new Date(today + 'T00:00:00');
-  d.setDate(d.getDate() - 1);
-  return todayISO(d) === last;
-}
-
 export type StarCount = 1 | 2 | 3;
 
 interface GameState {
@@ -27,18 +14,12 @@ interface GameState {
   unlockedLevel: number;
   movesThisLevel: number;
   sfxEnabled: boolean;
-  audioEnabled: boolean; // alias of sfxEnabled (kept for legacy reads)
+  audioEnabled: boolean;
   tutorialSeenLevels: number[];
 
   bestStars: Record<number, StarCount>;
 
-  streak: number;
-  lastPlayDate: string;
-  dailyHistory: Record<string, { completed: boolean; stars: StarCount }>;
-  dailyMode: boolean;
-  dailyLevelId: number;
-
-  equippedSkin: string;
+  equippedPalette: string;
 
   watchCooldownUntil: number;
 
@@ -53,13 +34,7 @@ interface GameState {
   starsFor: (levelId: number) => StarCount | 0;
   totalStars: () => number;
 
-  tickStreakOnWin: () => { streak: number; milestone: boolean };
-  recordDailyResult: (date: string, completed: boolean, stars: StarCount) => void;
-  isDailyDoneToday: () => boolean;
-  startDaily: (levelId: number) => void;
-  endDaily: () => void;
-
-  setEquippedSkin: (id: string) => void;
+  setEquippedPalette: (id: string) => void;
   resetProgress: () => void;
   unlockAll: () => void;
 
@@ -80,13 +55,7 @@ const store = createStore<GameState>()(
 
       bestStars: {},
 
-      streak: 0,
-      lastPlayDate: '',
-      dailyHistory: {},
-      dailyMode: false,
-      dailyLevelId: 0,
-
-      equippedSkin: 'default',
+      equippedPalette: 'classic',
 
       watchCooldownUntil: 0,
 
@@ -120,39 +89,16 @@ const store = createStore<GameState>()(
       starsFor: (levelId) => get().bestStars[levelId] ?? 0,
       totalStars: () =>
         Object.values(get().bestStars).reduce((sum, s) => sum + (s as number), 0),
-      tickStreakOnWin: () => {
-        const today = todayISO();
-        const last = get().lastPlayDate;
-        if (last === today) return { streak: get().streak, milestone: false };
-        let next: number;
-        if (last && isYesterday(last, today)) {
-          next = get().streak + 1;
-        } else {
-          next = 1;
-        }
-        set({ streak: next, lastPlayDate: today });
-        const milestone = next === 3 || next === 7 || next === 14 || next === 30 || (next > 30 && next % 30 === 0);
-        return { streak: next, milestone };
-      },
-      recordDailyResult: (date, completed, stars) =>
-        set((s) => ({ dailyHistory: { ...s.dailyHistory, [date]: { completed, stars } } })),
-      isDailyDoneToday: () => {
-        const today = todayISO();
-        return get().dailyHistory[today]?.completed === true;
-      },
-      startDaily: (levelId) =>
-        set({ dailyMode: true, dailyLevelId: levelId, currentLevel: levelId, movesThisLevel: 0 }),
-      endDaily: () => set({ dailyMode: false, dailyLevelId: 0 }),
-      setEquippedSkin: (id) => set({ equippedSkin: id }),
+      setEquippedPalette: (id) => set({ equippedPalette: id }),
       resetProgress: () =>
         set({
           currentLevel: 1, unlockedLevel: 1, movesThisLevel: 0, tutorialSeenLevels: [],
-          bestStars: {}, streak: 0, lastPlayDate: '', dailyHistory: {}, watchCooldownUntil: 0,
+          bestStars: {}, watchCooldownUntil: 0,
         }),
       unlockAll: () => set({ unlockedLevel: TOTAL_LEVELS }),
 
       startWatchCooldown: () => {
-        if (DEV) return; // dev: no cooldown
+        if (DEV) return;
         set({ watchCooldownUntil: Date.now() + WATCH_COOLDOWN_MS });
       },
       isWatchOnCooldown: () => {
@@ -175,10 +121,7 @@ const store = createStore<GameState>()(
         audioEnabled: s.audioEnabled,
         tutorialSeenLevels: s.tutorialSeenLevels,
         bestStars: s.bestStars,
-        streak: s.streak,
-        lastPlayDate: s.lastPlayDate,
-        dailyHistory: s.dailyHistory,
-        equippedSkin: s.equippedSkin,
+        equippedPalette: s.equippedPalette,
         watchCooldownUntil: s.watchCooldownUntil,
       }) as Partial<GameState>,
       migrate: (persisted: unknown) => {
@@ -196,10 +139,20 @@ const store = createStore<GameState>()(
           if (!p.bestStars || typeof p.bestStars !== 'object') {
             p.bestStars = {};
           }
-          if (typeof p.streak !== 'number') p.streak = 0;
-          if (typeof p.lastPlayDate !== 'string') p.lastPlayDate = '';
-          if (!p.dailyHistory || typeof p.dailyHistory !== 'object') p.dailyHistory = {};
-          if (typeof p.equippedSkin !== 'string') p.equippedSkin = 'default';
+          // Migrate equippedSkin → equippedPalette
+          if (typeof p.equippedPalette !== 'string') {
+            if (typeof p.equippedSkin === 'string') {
+              p.equippedPalette = 'classic';
+            } else {
+              p.equippedPalette = 'classic';
+            }
+          }
+          delete p.streak;
+          delete p.lastPlayDate;
+          delete p.dailyHistory;
+          delete p.dailyMode;
+          delete p.dailyLevelId;
+          delete p.equippedSkin;
           delete p.tutorialDone;
         }
         return persisted as GameState;

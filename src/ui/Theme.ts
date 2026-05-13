@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { paletteUI } from '../config/Palettes';
 
 export const TOKENS = {
   cream: 0xfbf3d5,
@@ -254,7 +255,8 @@ export function neoPill(
 
 export function dottedBackground(scene: Phaser.Scene): void {
   const { width, height } = scene.scale;
-  scene.cameras.main.setBackgroundColor(TOKENS.creamHex);
+  const ui = paletteUI();
+  scene.cameras.main.setBackgroundColor(ui.bgHex);
   const g = scene.add.graphics();
   g.fillStyle(TOKENS.ink, 0.18);
   const spacing = 40;

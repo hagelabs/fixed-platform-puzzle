@@ -37,6 +37,7 @@ import {
   NeoButtonHandle,
 } from "../ui/Theme";
 import { LevelTutorial, LEVEL_TUTORIALS } from "../ui/LevelTutorial";
+import { paletteUI } from "../config/Palettes";
 
 export class GameScene extends Phaser.Scene {
   private grid!: Grid;
@@ -257,13 +258,14 @@ export class GameScene extends Phaser.Scene {
     const store = useGameStore.getState();
 
     const headerY = 64;
+    const ui = paletteUI();
     this.drawHudLabel(
       116,
       headerY,
       172,
       86,
       `LV ${store.currentLevel}`,
-      TOKENS.mint,
+      ui.primary,
     );
 
     this.movesText = this.add
@@ -297,7 +299,7 @@ export class GameScene extends Phaser.Scene {
       btnW,
       86,
       "UNDO",
-      TOKENS.yellow,
+      ui.accent,
       () => this.undo(),
       { textSize: 32 },
     );
@@ -308,7 +310,7 @@ export class GameScene extends Phaser.Scene {
       btnW,
       86,
       "HINT",
-      TOKENS.sky,
+      ui.secondary,
       () => this.requestHint(),
       { textSize: 32 },
     );
@@ -319,7 +321,7 @@ export class GameScene extends Phaser.Scene {
       btnW,
       86,
       "SKIP",
-      TOKENS.mint,
+      ui.primary,
       () => this.requestWatch(),
       { textSize: 26 },
     );
@@ -336,7 +338,7 @@ export class GameScene extends Phaser.Scene {
       btnW,
       86,
       "RESTART",
-      TOKENS.danger,
+      ui.danger,
       () => {
         if (this.watchPlaying) return;
         this.scene.restart();

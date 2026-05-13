@@ -80,41 +80,45 @@ export class LevelSelectScene extends Phaser.Scene {
     }
 
     const header = this.add
-      .text(width / 2 + 36, 100, 'SELECT LEVEL', {
+      .text(width / 2, 100, 'SELECT LEVEL', {
         fontFamily: FONT_NEO,
         fontSize: '54px',
         color: TOKENS.inkHex,
+        align: 'center',
       })
       .setOrigin(0.5);
     popIn(this, header, 100);
 
-    this.drawPackTabs(width, 210);
+    // Pack tabs on left column, grid centered in remaining right area
+    const tabsX = 230;
+    const tabW = 340;
+    const gridLeftBound = tabsX + tabW / 2; // right edge of tabs column
+    this.drawPackTabs(tabsX, 250);
     this.gridLayer = this.add.container(0, 0);
-    this.renderPackGrid(this.activePackId, width, height);
+    this.renderPackGrid(this.activePackId, width, height, gridLeftBound);
   }
 
-  private drawPackTabs(width: number, y: number): void {
-    const tabW = 380;
-    const gap = 40;
-    const totalW = PACKS.length * tabW + (PACKS.length - 1) * gap;
-    const startX = (width - totalW) / 2 + tabW / 2;
+  private drawPackTabs(x: number, startY: number): void {
+    const tabW = 340;
+    const tabH = 130;
+    const gap = 26;
     const store = useGameStore.getState();
 
     PACKS.forEach((pack, i) => {
-      const x = startX + i * (tabW + gap);
+      const y = startY + i * (tabH + gap) + tabH / 2;
       const packUnlocked = store.unlockedLevel >= pack.unlockAfter + 1;
       const active = pack.id === this.activePackId;
       const fill = !packUnlocked ? TOKENS.lockGray : active ? TOKENS.sky : TOKENS.white;
       const stars = pack.levelIds.reduce((sum, id) => sum + store.starsFor(id), 0);
       const maxStars = pack.levelIds.length * 3;
-      const label = `${pack.name.toUpperCase()}  ${stars}/${maxStars}★`;
+      const label = `${pack.name.toUpperCase()}\n${stars}/${maxStars}★`;
 
       const btn = neoButton(
         this,
         x,
         y,
         tabW,
-        100,
+        tabH,
         label,
         fill,
         () => {
@@ -122,14 +126,14 @@ export class LevelSelectScene extends Phaser.Scene {
           AudioManager.uiTap();
           this.scene.start(SCENE_KEYS.LevelSelect, { activePackId: pack.id });
         },
-        { textSize: 24 },
+        { textSize: 28 },
       );
       if (!packUnlocked) btn.setEnabled(false);
       slideUpIn(this, btn.container, 160 + i * 60);
     });
   }
 
-  private renderPackGrid(packId: string, width: number, height: number): void {
+  private renderPackGrid(packId: string, width: number, height: number, _leftBound: number): void {
     const pack = PACKS.find((p) => p.id === packId);
     if (!pack) return;
     const store = useGameStore.getState();
@@ -143,7 +147,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const gridW = cols * tile + (cols - 1) * gapX;
     const gridH = rows * tile + (rows - 1) * gapY;
     const startX = (width - gridW) / 2 + tile / 2;
-    const startY = 380 + tile / 2;
+    const startY = 250 + tile / 2;
     const usableY = height - 120;
     const adjStartY = startY + gridH > usableY ? usableY - gridH + tile / 2 : startY;
 

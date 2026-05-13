@@ -119,7 +119,7 @@ export class MenuScene extends Phaser.Scene {
 
     const skinsBtn = neoPill(
       this,
-      width - 360,
+      width - 430,
       70,
       'SKINS',
       () => {

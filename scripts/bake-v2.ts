@@ -335,11 +335,12 @@ function inferPhase(idx: number, par: number, side: ExitSide): Phase {
   let exits = 1;
 
   if (pack === 'tutorial') {
-    // 1-3 movables, intro each mechanic
-    if (par <= 2) { movables = 1; yellows = 0; deps = 0; obstacles = 0; depthMode = 'none'; }
-    else if (par <= 3) { movables = 2; yellows = idx === 2 ? 1 : 0; deps = 0; obstacles = 0; depthMode = 'none'; }
-    else if (par <= 4) { movables = 2; yellows = 1; deps = idx >= 4 ? 1 : 0; obstacles = idx === 3 ? 1 : 0; depthMode = deps > 0 ? 'linear' : 'none'; }
-    else { movables = 3; yellows = 1; deps = 1; obstacles = 1; depthMode = 'linear'; }
+    // Brief targets: 2,3,3,4,4,5,5,6. Layout MUST force min par.
+    if (par <= 2) { movables = 2; yellows = 0; deps = 0; obstacles = 0; depthMode = 'none'; }
+    else if (par <= 3) { movables = 2; yellows = idx === 2 ? 1 : 0; deps = 0; obstacles = 1; depthMode = 'none'; }
+    else if (par <= 4) { movables = 3; yellows = idx === 3 ? 1 : 0; deps = idx >= 4 ? 1 : 0; obstacles = 1; depthMode = deps > 0 ? 'linear' : 'none'; }
+    else if (par <= 5) { movables = 3; yellows = 1; deps = 1; obstacles = 1; depthMode = 'linear'; }
+    else { movables = 3; yellows = 1; deps = 1; obstacles = 2; depthMode = 'linear'; }
   } else if (pack === 'hook') {
     // 3-4 movables, dependent showcase
     movables = par <= 8 ? 3 : 4;
@@ -372,10 +373,12 @@ function inferPhase(idx: number, par: number, side: ExitSide): Phase {
     if (par >= 21) exits = 2;
   }
 
+  // Tutorial: tight band (must hit brief par exactly within ±1)
+  const tight = pack === 'tutorial';
   return {
     cols, rows, movables, yellows, deps, obstacles, exits,
-    optMin: Math.max(1, par - 2),
-    optMax: par + 3,
+    optMin: tight ? par : Math.max(1, par - 2),
+    optMax: tight ? par + 1 : par + 3,
     depthMode,
     primarySide: side,
   };

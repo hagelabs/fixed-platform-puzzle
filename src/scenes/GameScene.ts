@@ -164,9 +164,9 @@ export class GameScene extends Phaser.Scene {
     if (!this.tutorial) return;
     const level = useGameStore.getState().currentLevel;
     useGameStore.getState().markTutorialSeen(level);
-    this.tutorial.dismiss();
-    this.tutorial = undefined;
+    this.tutorial.dismiss(this.blocks, this.grid);
     this.events.off("tutorial:moved", this.dismissTutorial, this);
+    // Keep `this.tutorial` reference so SHUTDOWN destroys follow-up overlays too.
   }
 
   private refreshHover(): void {
@@ -204,6 +204,10 @@ export class GameScene extends Phaser.Scene {
     if (!parent || parent.removed) return;
     this.drawHintRing(parent);
     AudioManager.hover();
+    // Advance tutorial tap-stage if currently awaiting an inspect tap
+    if (this.tutorial?.isAwaitingTap()) {
+      this.tutorial.advanceAfterTap(this.blocks, this.grid);
+    }
   }
 
   private drawHintRing(target: Block): void {

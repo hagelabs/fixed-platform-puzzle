@@ -4,11 +4,29 @@ import { Direction } from '../types/Game';
 import { Block } from '../entities/Block';
 import { Grid } from '../entities/Grid';
 
-export interface LevelTutorialConfig {
+export interface TutorialTapStage {
   title: string;
   message: string;
-  highlightBlockId: string;
-  hintDir: Direction;
+  blockId: string; // locked block to tap
+}
+
+export interface TutorialFollowUp {
+  title: string;
+  message: string;
+  highlightBlockId?: string;
+  durationMs?: number; // auto-fade after this; 0 = stay until tap
+}
+
+export interface LevelTutorialConfig {
+  // Optional first stage: ask player to TAP a locked block. Dismissed on tutorial:inspected.
+  tapFirst?: TutorialTapStage;
+  // Main (swipe) stage. Shown initially, or after tapFirst dismissed.
+  title: string;
+  message: string;
+  highlightBlockId?: string;
+  hintDir?: Direction;
+  iceHighlight?: boolean;
+  followUp?: TutorialFollowUp;
 }
 
 export class LevelTutorial {
@@ -16,6 +34,11 @@ export class LevelTutorial {
   private bubble?: Phaser.GameObjects.Container;
   private highlightContainer?: Phaser.GameObjects.Container;
   private arrowContainer?: Phaser.GameObjects.Container;
+  private iceHighlightContainer?: Phaser.GameObjects.Graphics;
+  private followUpBubble?: Phaser.GameObjects.Container;
+  private followUpHighlight?: Phaser.GameObjects.Container;
+  private followUpTimer?: Phaser.Time.TimerEvent;
+  private cfg?: LevelTutorialConfig;
   private dismissed = false;
 
   constructor(scene: Phaser.Scene) {
@@ -23,41 +46,204 @@ export class LevelTutorial {
   }
 
   show(cfg: LevelTutorialConfig, blocks: Block[], grid: Grid): void {
-    this.drawBubble(cfg.title, cfg.message);
-    const block = blocks.find((b) => b.blockId === cfg.highlightBlockId);
-    if (block) {
-      this.drawHighlight(block, grid);
-      this.drawGhostArrow(block, cfg.hintDir);
+    this.cfg = cfg;
+    if (cfg.tapFirst) {
+      this.showTapStage(cfg.tapFirst, blocks, grid);
+    } else {
+      this.showMainStage(cfg, blocks, grid);
     }
   }
 
-  dismiss(): void {
+  // Stage 1: ask player to TAP locked block. Caller invokes advanceAfterTap on
+  // tutorial:inspected event.
+  private showTapStage(stage: TutorialTapStage, blocks: Block[], grid: Grid): void {
+    this.drawBubble(stage.title, stage.message);
+    const block = blocks.find((b) => b.blockId === stage.blockId);
+    if (block) this.drawHighlight(block, grid, 0x55B4FF); // blue ring = inspect target
+  }
+
+  // Stage 2: swipe direction with arrow.
+  private showMainStage(cfg: LevelTutorialConfig, blocks: Block[], grid: Grid): void {
+    this.drawBubble(cfg.title, cfg.message);
+    if (cfg.highlightBlockId) {
+      const block = blocks.find((b) => b.blockId === cfg.highlightBlockId);
+      if (block) {
+        this.drawHighlight(block, grid);
+        if (cfg.hintDir) this.drawGhostArrow(block, cfg.hintDir);
+      }
+    }
+    if (cfg.iceHighlight) this.drawIceHighlight(grid);
+  }
+
+  // Called when player taps locked block during tap-first stage.
+  // Transitions to main swipe stage.
+  advanceAfterTap(blocks: Block[], grid: Grid): void {
+    if (!this.cfg || !this.cfg.tapFirst || this.dismissed) return;
+    // Fade out tap-stage overlays then show main stage
+    const targets: Phaser.GameObjects.GameObject[] = [];
+    if (this.bubble) targets.push(this.bubble);
+    if (this.highlightContainer) targets.push(this.highlightContainer);
+    if (targets.length > 0) {
+      this.scene.tweens.add({
+        targets, alpha: 0, duration: 220, ease: 'Sine.easeOut',
+        onComplete: () => targets.forEach((t) => t.destroy()),
+      });
+    }
+    this.bubble = undefined;
+    this.highlightContainer = undefined;
+    // Clear tapFirst so dismiss() doesn't try to re-show
+    const mainCfg = { ...this.cfg, tapFirst: undefined };
+    this.cfg = mainCfg;
+    this.scene.time.delayedCall(280, () => this.showMainStage(mainCfg, blocks, grid));
+  }
+
+  isAwaitingTap(): boolean {
+    return !!this.cfg?.tapFirst && !this.dismissed;
+  }
+
+  dismiss(blocks?: Block[], grid?: Grid): void {
     if (this.dismissed) return;
     this.dismissed = true;
-    const targets = [this.bubble, this.highlightContainer, this.arrowContainer].filter(
-      Boolean,
-    ) as Phaser.GameObjects.Container[];
-    if (targets.length === 0) return;
-    this.scene.tweens.add({
-      targets,
-      alpha: 0,
-      duration: 220,
-      ease: 'Sine.easeOut',
-      onComplete: () => targets.forEach((c) => c.destroy()),
-    });
+    const primary: Phaser.GameObjects.GameObject[] = [];
+    if (this.bubble) primary.push(this.bubble);
+    if (this.highlightContainer) primary.push(this.highlightContainer);
+    if (this.arrowContainer) primary.push(this.arrowContainer);
+    if (this.iceHighlightContainer) primary.push(this.iceHighlightContainer);
+    if (primary.length > 0) {
+      this.scene.tweens.add({
+        targets: primary,
+        alpha: 0,
+        duration: 220,
+        ease: 'Sine.easeOut',
+        onComplete: () => primary.forEach((c) => c.destroy()),
+      });
+    }
     this.bubble = undefined;
     this.highlightContainer = undefined;
     this.arrowContainer = undefined;
+    this.iceHighlightContainer = undefined;
+
+    // Show follow-up after primary dismiss
+    if (this.cfg?.followUp && blocks && grid) {
+      this.scene.time.delayedCall(280, () => this.drawFollowUp(this.cfg!.followUp!, blocks, grid));
+    }
   }
 
   destroy(): void {
     this.bubble?.destroy();
     this.highlightContainer?.destroy();
     this.arrowContainer?.destroy();
+    this.iceHighlightContainer?.destroy();
+    this.followUpBubble?.destroy();
+    this.followUpHighlight?.destroy();
+    this.followUpTimer?.remove(false);
     this.bubble = undefined;
     this.highlightContainer = undefined;
     this.arrowContainer = undefined;
+    this.iceHighlightContainer = undefined;
+    this.followUpBubble = undefined;
+    this.followUpHighlight = undefined;
+    this.followUpTimer = undefined;
     this.dismissed = true;
+  }
+
+  private drawIceHighlight(grid: Grid): void {
+    const g = this.scene.add.graphics();
+    g.lineStyle(4, 0x4A90D9, 0.9);
+    for (let c = 0; c < grid.cols; c++) {
+      for (let r = 0; r < grid.rows; r++) {
+        if (!grid.hasIce(c, r)) continue;
+        const x = grid.worldX(c);
+        const y = grid.worldY(r);
+        const s = grid.cellSize - 12;
+        g.strokeRoundedRect(x - s / 2, y - s / 2, s, s, 8);
+      }
+    }
+    g.setDepth(45);
+    this.scene.tweens.add({
+      targets: g,
+      alpha: { from: 1, to: 0.4 },
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    this.iceHighlightContainer = g;
+  }
+
+  private drawFollowUp(fu: TutorialFollowUp, blocks: Block[], grid: Grid): void {
+    const w = 920;
+    const h = 110;
+    const g = this.scene.add.graphics();
+    g.fillStyle(TOKENS.ink, 1);
+    g.fillRoundedRect(-w / 2 + 4, -h / 2 + 4, w, h, TOKENS.cornerR);
+    g.fillStyle(TOKENS.ink, 1);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, TOKENS.cornerR);
+    g.fillStyle(TOKENS.white, 1);
+    g.fillRoundedRect(-w / 2 + TOKENS.borderPx, -h / 2 + TOKENS.borderPx, w - TOKENS.borderPx * 2, h - TOKENS.borderPx * 2, TOKENS.cornerR - 2);
+
+    const titleTxt = this.scene.add
+      .text(0, -20, fu.title, { fontFamily: FONT_NEO, fontSize: '20px', color: TOKENS.inkHex })
+      .setOrigin(0.5);
+    const bodyTxt = this.scene.add
+      .text(0, 12, fu.message, {
+        fontFamily: FONT_NEO, fontSize: '18px', color: TOKENS.inkHex,
+        align: 'center', wordWrap: { width: w - 48 },
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.85);
+
+    const c = this.scene.add.container(this.scene.scale.width / 2, this.scene.scale.height - 180, [g, titleTxt, bodyTxt]);
+    c.setDepth(110);
+    c.setAlpha(0);
+    this.scene.tweens.add({ targets: c, alpha: 1, duration: 260, ease: 'Sine.easeOut' });
+    this.followUpBubble = c;
+
+    if (fu.highlightBlockId) {
+      const block = blocks.find((b) => b.blockId === fu.highlightBlockId);
+      if (block) {
+        const hg = this.scene.add.graphics();
+        hg.lineStyle(6, 0x55B4FF, 1);
+        const halfW = block.size[0] * (grid.cellSize / 2);
+        const halfH = block.size[1] * (grid.cellSize / 2);
+        hg.strokeRoundedRect(-halfW - 6, -halfH - 6, halfW * 2 + 12, halfH * 2 + 12, 14);
+        const hc = this.scene.add.container(block.x, block.y, [hg]);
+        hc.setDepth(50);
+        this.scene.tweens.add({
+          targets: hc,
+          scale: { from: 1, to: 1.12 },
+          alpha: { from: 1, to: 0.5 },
+          duration: 700,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+        this.followUpHighlight = hc;
+      }
+    }
+
+    const duration = fu.durationMs ?? 6000;
+    if (duration > 0) {
+      this.followUpTimer = this.scene.time.delayedCall(duration, () => this.dismissFollowUp());
+    }
+  }
+
+  dismissFollowUp(): void {
+    const targets: Phaser.GameObjects.GameObject[] = [];
+    if (this.followUpBubble) targets.push(this.followUpBubble);
+    if (this.followUpHighlight) targets.push(this.followUpHighlight);
+    if (targets.length === 0) return;
+    this.scene.tweens.add({
+      targets,
+      alpha: 0,
+      duration: 240,
+      ease: 'Sine.easeOut',
+      onComplete: () => targets.forEach((t) => t.destroy()),
+    });
+    this.followUpBubble = undefined;
+    this.followUpHighlight = undefined;
+    this.followUpTimer?.remove(false);
+    this.followUpTimer = undefined;
   }
 
   private drawBubble(title: string, message: string): void {
@@ -106,9 +292,9 @@ export class LevelTutorial {
     this.bubble = c;
   }
 
-  private drawHighlight(block: Block, grid: Grid): void {
+  private drawHighlight(block: Block, grid: Grid, color: number = TOKENS.exitGlow): void {
     const g = this.scene.add.graphics();
-    g.lineStyle(8, TOKENS.exitGlow, 1);
+    g.lineStyle(8, color, 1);
     const halfW = block.size[0] * (grid.cellSize / 2);
     const halfH = block.size[1] * (grid.cellSize / 2);
     g.strokeRoundedRect(-halfW - 6, -halfH - 6, halfW * 2 + 12, halfH * 2 + 12, 14);
@@ -190,8 +376,26 @@ export const LEVEL_TUTORIALS: Record<number, LevelTutorialConfig> = {
     hintDir: 'LEFT',
   },
   5: {
-    title: 'DEPENDENCY',
-    message: 'BLUE UNLOCKS AFTER ITS PARTNER LEAVES. SLIDE THE RED ONE OUT FIRST.',
+    tapFirst: {
+      title: 'INSPECT',
+      message: 'TAP THE LOCKED BLUE BLOCK TO SEE WHICH BLOCK BLOCKS IT.',
+      blockId: 'm3',
+    },
+    title: 'SLIDE',
+    message: 'NOW SLIDE THE RED BLOCK OUT TO UNLOCK THE BLUE.',
+    highlightBlockId: 'm1',
+    hintDir: 'RIGHT',
+  },
+  73: {
+    title: 'ICE',
+    message: 'BLOCKS CANNOT STOP ON ICE. IF YOUR SLIDE WOULD END HERE, ICE PUSHES YOU PAST THE BLOCKER.',
+    highlightBlockId: 'm1',
+    hintDir: 'RIGHT',
+    iceHighlight: true,
+  },
+  76: {
+    title: 'LOCK',
+    message: 'PADLOCK BLOCKS WAIT. THE NUMBER COUNTS DOWN AS OTHER BLOCKS EXIT — ONLY THEN CAN IT MOVE.',
     highlightBlockId: 'm1',
     hintDir: 'RIGHT',
   },

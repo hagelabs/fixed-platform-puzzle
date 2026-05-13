@@ -105,19 +105,19 @@ export const LEVELS: LevelData[] = [
   L(71, 9, 9, [O('o1',1,6), O('o2',8,5), O('o3',0,3), O('o4',4,8), O('o5',8,2), C('m1',1,5,'LEFT'), S('m2',5,3), D('m3',8,1,'m1'), D('m4',8,0,'m3'), D('m5',2,5,'m4')], [E('LEFT',5)], 22, 'master'),
   L(72, 10, 10, [O('o1',9,1), O('o2',2,6), O('o3',8,2), O('o4',6,5), O('o5',1,7), O('o6',5,0), O('o7',4,3), O('o8',4,8), C('m1',6,2,'UP'), S('m2',6,4), D('m3',2,3,'m1'), D('m4',6,9,'m3'), D('m5',0,8,'m4')], [E('TOP',6)], 25, 'master'),
 
-  // === MASTER PACK FIXTURES (L73-78): ice push + lock counter intros ===
+  // === MASTER PACK FIXTURES (L73-78): single-exit ice + lock intros ===
   // L73 — ice push intro: skip 1 obstacle
   L(73, 5, 3, [SC('m1',0,1,'red'), O('o1',2,1)], [E('RIGHT',1)], 2, 'master', [[1,1]]),
   // L74 — chain push through two obstacles
   L(74, 7, 3, [SC('m1',0,1,'red'), O('o1',2,1), O('o2',4,1)], [E('RIGHT',1)], 2, 'master', [[1,1],[3,1]]),
-  // L75 — parallel ice paths, 2 simples
-  L(75, 6, 4, [SC('m1',0,1,'red'), SC('m2',0,2,'blue'), O('o1',3,1), O('o2',3,2)], [E('RIGHT',1), E('RIGHT',2)], 4, 'master', [[2,1],[2,2]]),
+  // L75 — chain push landing on ice
+  L(75, 6, 3, [SC('m1',0,1,'red'), O('o1',3,1)], [E('RIGHT',1)], 2, 'master', [[2,1],[4,1]]),
   // L76 — lock counter intro: unlockAt 1
-  L(76, 6, 2, [SC('m1',0,0,'red'), K('k1',0,1,1)], [E('RIGHT',0), E('RIGHT',1)], 2, 'master'),
+  L(76, 6, 3, [SC('m1',0,1,'red'), K('k1',0,2,1), O('o1',5,0)], [E('RIGHT',1)], 4, 'master'),
   // L77 — lock unlockAt 2 (need 2 exits first)
-  L(77, 7, 3, [SC('m1',0,0,'red'), SC('m2',0,1,'blue'), K('k1',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
-  // L78 — two locks, staggered unlock (1 and 2) — master climax intro
-  L(78, 8, 3, [SC('m1',0,0,'red'), K('k1',0,1,1), K('k2',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
+  L(77, 7, 3, [SC('m1',0,1,'red'), SC('m2',0,2,'blue'), K('k1',6,2,2), O('o1',5,0), O('o2',6,0)], [E('RIGHT',1)], 6, 'master'),
+  // L78 — two locks, staggered unlock (1 and 2)
+  L(78, 8, 3, [SC('m1',0,1,'red'), K('k1',0,2,1), K('k2',7,2,2), O('o1',6,0), O('o2',7,0)], [E('RIGHT',1)], 6, 'master'),
   // === FIXTURE PACK (L79-80): legendary finale ===
   // L79 — Penultimate showcase. Ice push + lock counter + dep chain depth 4 + all mechanics.
   // Single exit RIGHT row 5. Lock at (5,5) opens after 3 exits.
@@ -222,10 +222,10 @@ export const SOLUTIONS: Record<number, SolutionMove[]> = {
   72: [{blockId:'m1',dir:'UP'}, {blockId:'m3',dir:'UP'}, {blockId:'m3',dir:'RIGHT'}, {blockId:'m3',dir:'DOWN'}, {blockId:'m3',dir:'RIGHT'}, {blockId:'m3',dir:'UP'}, {blockId:'m3',dir:'LEFT'}, {blockId:'m3',dir:'UP'}, {blockId:'m4',dir:'UP'}, {blockId:'m4',dir:'LEFT'}, {blockId:'m4',dir:'UP'}, {blockId:'m2',dir:'UP'}, {blockId:'m4',dir:'RIGHT'}, {blockId:'m4',dir:'DOWN'}, {blockId:'m4',dir:'RIGHT'}, {blockId:'m4',dir:'UP'}, {blockId:'m4',dir:'LEFT'}, {blockId:'m4',dir:'UP'}, {blockId:'m5',dir:'UP'}, {blockId:'m5',dir:'RIGHT'}, {blockId:'m5',dir:'DOWN'}, {blockId:'m5',dir:'RIGHT'}, {blockId:'m5',dir:'UP'}, {blockId:'m5',dir:'LEFT'}, {blockId:'m5',dir:'UP'}],
   73: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
   74: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
-  75: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'}],
-  76: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
-  77: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
-  78: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k2',dir:'RIGHT'}],
+  75: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
+  76: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k1',dir:'UP'},{blockId:'k1',dir:'RIGHT'}],
+  77: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'UP'},{blockId:'m2',dir:'RIGHT'},{blockId:'k1',dir:'UP'},{blockId:'k1',dir:'RIGHT'}],
+  78: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k1',dir:'UP'},{blockId:'k1',dir:'RIGHT'},{blockId:'k2',dir:'UP'},{blockId:'k2',dir:'RIGHT'}],
   79: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'UP'},{blockId:'m1',dir:'RIGHT'},{blockId:'m5',dir:'UP'},{blockId:'m5',dir:'LEFT'},{blockId:'m5',dir:'UP'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'DOWN'},{blockId:'m5',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'UP'},{blockId:'m2',dir:'RIGHT'},{blockId:'m3',dir:'RIGHT'},{blockId:'m3',dir:'DOWN'},{blockId:'m3',dir:'RIGHT'},{blockId:'m3',dir:'UP'},{blockId:'m3',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'m5',dir:'RIGHT'},{blockId:'m4',dir:'LEFT'},{blockId:'m4',dir:'DOWN'},{blockId:'m4',dir:'RIGHT'},{blockId:'m4',dir:'UP'},{blockId:'m4',dir:'RIGHT'}],
   80: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m6',dir:'DOWN'},{blockId:'m6',dir:'LEFT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'UP'},{blockId:'m6',dir:'RIGHT'},{blockId:'m6',dir:'UP'},{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m6',dir:'LEFT'},{blockId:'m6',dir:'UP'},{blockId:'m2',dir:'LEFT'},{blockId:'m2',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'UP'},{blockId:'m2',dir:'RIGHT'},{blockId:'m3',dir:'RIGHT'},{blockId:'m3',dir:'DOWN'},{blockId:'m3',dir:'RIGHT'},{blockId:'m3',dir:'UP'},{blockId:'m3',dir:'RIGHT'},{blockId:'m4',dir:'LEFT'},{blockId:'m4',dir:'DOWN'},{blockId:'m4',dir:'RIGHT'},{blockId:'m4',dir:'UP'},{blockId:'m4',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'m5',dir:'RIGHT'},{blockId:'m6',dir:'DOWN'},{blockId:'m6',dir:'RIGHT'},{blockId:'m6',dir:'UP'},{blockId:'m6',dir:'RIGHT'}],
 };

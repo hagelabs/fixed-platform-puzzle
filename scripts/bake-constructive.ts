@@ -482,11 +482,67 @@ function forwardAttempt(
     if (blocked) {
       const dist = Math.abs(c - sC) + Math.abs(r - sR);
       if (dist === 0) return null;
-      if (ctx.iceSet.has(cellKey(c, r, ctx.cols))) return null;
+      // Ice push: if natural stop is ice, skip past blocker
+      if (ctx.iceSet.has(cellKey(c, r, ctx.cols))) {
+        const pushed = forwardIcePush(ctx, positions, idx, c, r, nc, nr, dir);
+        if (pushed) {
+          if (pushed.exit) return { kind: 'exit' };
+          return { kind: 'slide', nextC: pushed.col, nextR: pushed.row };
+        }
+        return null;
+      }
       return { kind: 'slide', nextC: c, nextR: r };
     }
     c = nc; r = nr;
   }
+}
+
+// Ice push: when slide stops on ice, jump past the blocker. Recurse if landing on another ice.
+function forwardIcePush(
+  ctx: SolverCtx, positions: Pos[], selfIdx: number,
+  curC: number, curR: number, skipC: number, skipR: number, dir: Direction,
+): { col: number; row: number; exit: boolean } | null {
+  void curC; void curR;
+  const [dx, dy] = DELTA[dir];
+  const landC = skipC + dx;
+  const landR = skipR + dy;
+  if (landC < 0 || landC >= ctx.cols || landR < 0 || landR >= ctx.rows) {
+    const side = DIR_TO_SIDE[dir];
+    const exitIdx = side === 'LEFT' || side === 'RIGHT' ? skipR : skipC;
+    if (exitAt(ctx, side, exitIdx)) return { col: skipC, row: skipR, exit: true };
+    return null;
+  }
+  if (ctx.obstacleSet.has(cellKey(landC, landR, ctx.cols))) return null;
+  for (let i = 0; i < positions.length; i++) {
+    if (i === selfIdx) continue;
+    const p = positions[i];
+    if (!p) continue;
+    if (p[0] === landC && p[1] === landR) return null;
+  }
+  if (ctx.iceSet.has(cellKey(landC, landR, ctx.cols))) {
+    // chain push: try to skip another blocker
+    const nextC = landC + dx;
+    const nextR = landR + dy;
+    if (nextC < 0 || nextC >= ctx.cols || nextR < 0 || nextR >= ctx.rows) {
+      const side = DIR_TO_SIDE[dir];
+      const exitIdx = side === 'LEFT' || side === 'RIGHT' ? landR : landC;
+      if (exitAt(ctx, side, exitIdx)) return { col: landC, row: landR, exit: true };
+      return null;
+    }
+    const nextObs = ctx.obstacleSet.has(cellKey(nextC, nextR, ctx.cols));
+    let nextBlocked = nextObs;
+    if (!nextBlocked) {
+      for (let i = 0; i < positions.length; i++) {
+        if (i === selfIdx) continue;
+        const p = positions[i];
+        if (!p) continue;
+        if (p[0] === nextC && p[1] === nextR) { nextBlocked = true; break; }
+      }
+    }
+    if (nextBlocked) return forwardIcePush(ctx, positions, selfIdx, landC, landR, nextC, nextR, dir);
+    return { col: landC, row: landR, exit: false };
+  }
+  return { col: landC, row: landR, exit: false };
 }
 
 function stateKey(positions: Pos[], exitCount: number): string {

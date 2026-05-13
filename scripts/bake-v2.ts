@@ -637,8 +637,8 @@ const D = (id: string, c: number, r: number, dep: string): BlockData => ({
 const SC = (id: string, c: number, r: number, color: Color): BlockData => ({
   id, color, position: [c, r], size: [1, 1], type: 'simple',
 });
-const K = (id: string, c: number, r: number, color: Color): BlockData => ({
-  id, color, position: [c, r], size: [1, 1], type: 'lock',
+const K = (id: string, c: number, r: number, unlockAt: number, color: Color = 'purple'): BlockData => ({
+  id, color, position: [c, r], size: [1, 1], type: 'lock', unlockAt,
 });
 const E = (
   side: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT',
@@ -674,26 +674,32 @@ export const LEVELS: LevelData[] = [
     return `  L(${lvl.id}, ${lvl.cols}, ${lvl.rows}, [${blocksStr}], [${exitsStr}], ${opt}, '${packOf(lvl.id)}'),`;
   }).join('\n');
 
-  // Fixture levels — hand-authored to showcase ice + lock mechanics. Appended to master pack.
+  // Fixture levels — hand-authored to showcase ice (push) + lock (counter) mechanics. Appended to master pack.
   const fixtures = `
-  // === FIXTURE LEVELS (hand-authored: ice + lock mechanics) ===
-  L(121, 7, 7, [SC('m1',1,3,'red')], [E('RIGHT',3)], 1, 'master', [[3,3],[4,3]]),
-  L(122, 7, 7, [SC('m1',0,2,'red'), SC('m2',0,4,'blue')], [E('RIGHT',2), E('RIGHT',4)], 2, 'master', [[3,2],[3,4]]),
-  L(123, 8, 8, [SC('m1',1,4,'green'), O('o1',5,2)], [E('RIGHT',4)], 1, 'master', [[3,4],[4,4],[5,4],[6,4]]),
-  L(124, 7, 7, [SC('m1',0,3,'red'), K('k1',5,3,'red')], [E('RIGHT',3)], 2, 'master'),
-  L(125, 8, 8, [SC('m1',0,1,'blue'), K('k1',3,5,'blue'), O('o1',5,5)], [E('RIGHT',1), E('RIGHT',5)], 3, 'master'),
-  L(126, 9, 9, [SC('m1',0,4,'red'), K('k1',4,4,'red'), K('k2',7,4,'red')], [E('RIGHT',4)], 4, 'master'),`;
+  // === FIXTURE LEVELS (hand-authored: ice push + lock counter mechanics) ===
+  // L121 — ice push intro: skip 1 obstacle
+  L(121, 5, 3, [SC('m1',0,1,'red'), O('o1',2,1)], [E('RIGHT',1)], 2, 'master', [[1,1]]),
+  // L122 — chain push through two obstacles
+  L(122, 7, 3, [SC('m1',0,1,'red'), O('o1',2,1), O('o2',4,1)], [E('RIGHT',1)], 2, 'master', [[1,1],[3,1]]),
+  // L123 — parallel ice paths, 2 simples
+  L(123, 6, 4, [SC('m1',0,1,'red'), SC('m2',0,2,'blue'), O('o1',3,1), O('o2',3,2)], [E('RIGHT',1), E('RIGHT',2)], 4, 'master', [[2,1],[2,2]]),
+  // L124 — lock counter intro: unlockAt 1
+  L(124, 6, 2, [SC('m1',0,0,'red'), K('k1',0,1,1)], [E('RIGHT',0), E('RIGHT',1)], 2, 'master'),
+  // L125 — lock unlockAt 2 (need 2 exits first)
+  L(125, 7, 3, [SC('m1',0,0,'red'), SC('m2',0,1,'blue'), K('k1',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
+  // L126 — two locks, staggered unlock (1 and 2)
+  L(126, 8, 3, [SC('m1',0,0,'red'), K('k1',0,1,1), K('k2',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),`;
 
   const bakedSolutions = baked.map(({ lvl, path }) => {
     const moves = path.map((m) => `{blockId:'${m.blockId}',dir:'${m.dir}'}`).join(', ');
     return `  ${lvl.id}: [${moves}],`;
   }).join('\n');
 
-  const fixtureSolutions = `  121: [{blockId:'m1',dir:'RIGHT'}],
-  122: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'}],
-  123: [{blockId:'m1',dir:'RIGHT'}],
+  const fixtureSolutions = `  121: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
+  122: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
+  123: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'}],
   124: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
-  125: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k1',dir:'DOWN'}],
+  125: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
   126: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k2',dir:'RIGHT'}],`;
 
   const solutionsBody = bakedSolutions + '\n' + fixtureSolutions;

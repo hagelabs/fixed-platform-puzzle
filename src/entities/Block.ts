@@ -16,10 +16,12 @@ export class Block extends Phaser.GameObjects.Container {
   public readonly direction?: Direction;
   public readonly dependsOn?: string;
   public readonly allowedExits: ExitSide[];
+  public readonly unlockAt: number;
   public removed = false;
 
   private bodyG: Phaser.GameObjects.Graphics;
   private iconG?: Phaser.GameObjects.Graphics;
+  private countdownText?: Phaser.GameObjects.Text;
   private locked = false;
   private hitW = 0;
   private hitH = 0;
@@ -42,6 +44,7 @@ export class Block extends Phaser.GameObjects.Container {
     this.direction = data.direction;
     this.dependsOn = data.dependsOn;
     this.allowedExits = data.allowedExits ?? ['TOP', 'BOTTOM', 'LEFT', 'RIGHT'];
+    this.unlockAt = data.unlockAt ?? 0;
 
     const pxW = w * grid.cellSize - 14;
     const pxH = h * grid.cellSize - 14;
@@ -81,8 +84,15 @@ export class Block extends Phaser.GameObjects.Container {
   }
 
   public refreshLock(grid: Grid): void {
-    if (this.type !== 'lock' || !this.locked) return;
-    if (grid.isColorUnlocked(this.color)) this.unlock();
+    if (this.type !== 'lock') return;
+    const remaining = Math.max(0, this.unlockAt - grid.getExitCount());
+    if (this.countdownText) {
+      this.countdownText.setText(`${remaining}`);
+      if (remaining === 0) {
+        this.countdownText.setAlpha(0);
+      }
+    }
+    if (this.locked && remaining === 0) this.unlock();
   }
 
   private drawBody(fill: number): void {
@@ -177,11 +187,22 @@ export class Block extends Phaser.GameObjects.Container {
       g.fillRoundedRect(-bw / 2, -bh / 2 + sr * 0.4, bw, bh, 6);
       g.fillStyle(0xFFFFFF, 0.9);
       g.fillCircle(0, sr * 0.7, size * 0.05);
+      // countdown number badge below padlock body
+      const cd = this.scene.add.text(0, size * 0.32, `${this.unlockAt}`, {
+        fontFamily: 'Arial Black',
+        fontSize: `${Math.floor(size * 0.28)}px`,
+        color: '#FFFFFF',
+      }).setOrigin(0.5);
+      this.add(cd);
+      this.countdownText = cd;
     }
 
     this.add(g);
     this.iconG = g;
-    if (this.type === 'dependent' || this.type === 'lock') {
+    if (this.type === 'dependent') {
+      this.locked = true;
+      this.setAlpha(0.62);
+    } else if (this.type === 'lock' && this.unlockAt > 0) {
       this.locked = true;
       this.setAlpha(0.62);
     }

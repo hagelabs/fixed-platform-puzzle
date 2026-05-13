@@ -15,8 +15,8 @@ const D = (id: string, c: number, r: number, dep: string): BlockData => ({
 const SC = (id: string, c: number, r: number, color: Color): BlockData => ({
   id, color, position: [c, r], size: [1, 1], type: 'simple',
 });
-const K = (id: string, c: number, r: number, color: Color): BlockData => ({
-  id, color, position: [c, r], size: [1, 1], type: 'lock',
+const K = (id: string, c: number, r: number, unlockAt: number, color: Color = 'purple'): BlockData => ({
+  id, color, position: [c, r], size: [1, 1], type: 'lock', unlockAt,
 });
 const E = (
   side: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT',
@@ -153,13 +153,13 @@ export const LEVELS: LevelData[] = [
   L(119, 10, 10, [O('o1',3,2), O('o2',8,0), O('o3',7,0), O('o4',8,5), O('o5',7,5), C('m1',2,6,'RIGHT'), S('m2',6,6), D('m3',2,2,'m1'), D('m4',7,2,'m1'), D('m5',0,2,'m3')], [E('RIGHT',2), E('RIGHT',6)], 18, 'master'),
   L(120, 10, 10, [O('o1',9,8), O('o2',6,4), O('o3',7,6), O('o4',4,9), O('o5',2,7), C('m1',5,7,'DOWN'), S('m2',2,4), D('m3',2,0,'m1'), D('m4',2,5,'m1'), D('m5',2,1,'m3')], [E('BOTTOM',2), E('BOTTOM',5)], 16, 'master'),
 
-  // === FIXTURE LEVELS (hand-authored: ice + lock mechanics) ===
-  L(121, 7, 7, [SC('m1',1,3,'red')], [E('RIGHT',3)], 1, 'master', [[3,3],[4,3]]),
-  L(122, 7, 7, [SC('m1',0,2,'red'), SC('m2',0,4,'blue')], [E('RIGHT',2), E('RIGHT',4)], 2, 'master', [[3,2],[3,4]]),
-  L(123, 8, 8, [SC('m1',1,4,'green'), O('o1',5,2)], [E('RIGHT',4)], 1, 'master', [[3,4],[4,4],[5,4],[6,4]]),
-  L(124, 7, 7, [SC('m1',0,3,'red'), K('k1',5,3,'red')], [E('RIGHT',3)], 2, 'master'),
-  L(125, 8, 8, [SC('m1',0,1,'blue'), K('k1',3,5,'blue'), O('o1',5,5)], [E('RIGHT',1), E('RIGHT',5)], 3, 'master'),
-  L(126, 9, 9, [SC('m1',0,4,'red'), K('k1',4,4,'red'), K('k2',7,4,'red')], [E('RIGHT',4)], 4, 'master'),
+  // === FIXTURE LEVELS (hand-authored: ice push + lock counter mechanics) ===
+  L(121, 5, 3, [SC('m1',0,1,'red'), O('o1',2,1)], [E('RIGHT',1)], 2, 'master', [[1,1]]),
+  L(122, 7, 3, [SC('m1',0,1,'red'), O('o1',2,1), O('o2',4,1)], [E('RIGHT',1)], 2, 'master', [[1,1],[3,1]]),
+  L(123, 6, 4, [SC('m1',0,1,'red'), SC('m2',0,2,'blue'), O('o1',3,1), O('o2',3,2)], [E('RIGHT',1), E('RIGHT',2)], 4, 'master', [[2,1],[2,2]]),
+  L(124, 6, 2, [SC('m1',0,0,'red'), K('k1',0,1,1)], [E('RIGHT',0), E('RIGHT',1)], 2, 'master'),
+  L(125, 7, 3, [SC('m1',0,0,'red'), SC('m2',0,1,'blue'), K('k1',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
+  L(126, 8, 3, [SC('m1',0,0,'red'), K('k1',0,1,1), K('k2',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
 ];
 
 export type SolutionMove = { blockId: string; dir: Direction };
@@ -285,11 +285,11 @@ export const SOLUTIONS: Record<number, SolutionMove[]> = {
   118: [{blockId:'m1',dir:'UP'}, {blockId:'m3',dir:'RIGHT'}, {blockId:'m2',dir:'RIGHT'}, {blockId:'m2',dir:'UP'}, {blockId:'m2',dir:'LEFT'}, {blockId:'m4',dir:'RIGHT'}, {blockId:'m4',dir:'UP'}, {blockId:'m3',dir:'LEFT'}, {blockId:'m4',dir:'LEFT'}, {blockId:'m4',dir:'UP'}, {blockId:'m3',dir:'RIGHT'}, {blockId:'m3',dir:'UP'}, {blockId:'m2',dir:'UP'}, {blockId:'m5',dir:'UP'}, {blockId:'m4',dir:'DOWN'}, {blockId:'m4',dir:'LEFT'}, {blockId:'m4',dir:'UP'}],
   119: [{blockId:'m2',dir:'DOWN'}, {blockId:'m1',dir:'RIGHT'}, {blockId:'m2',dir:'RIGHT'}, {blockId:'m3',dir:'DOWN'}, {blockId:'m3',dir:'RIGHT'}, {blockId:'m3',dir:'UP'}, {blockId:'m3',dir:'RIGHT'}, {blockId:'m5',dir:'DOWN'}, {blockId:'m5',dir:'RIGHT'}, {blockId:'m5',dir:'UP'}, {blockId:'m2',dir:'LEFT'}, {blockId:'m5',dir:'DOWN'}, {blockId:'m2',dir:'RIGHT'}, {blockId:'m2',dir:'UP'}, {blockId:'m4',dir:'RIGHT'}, {blockId:'m5',dir:'UP'}, {blockId:'m5',dir:'RIGHT'}, {blockId:'m2',dir:'RIGHT'}],
   120: [{blockId:'m1',dir:'DOWN'}, {blockId:'m2',dir:'RIGHT'}, {blockId:'m2',dir:'DOWN'}, {blockId:'m3',dir:'LEFT'}, {blockId:'m4',dir:'LEFT'}, {blockId:'m3',dir:'DOWN'}, {blockId:'m3',dir:'RIGHT'}, {blockId:'m3',dir:'DOWN'}, {blockId:'m5',dir:'DOWN'}, {blockId:'m5',dir:'RIGHT'}, {blockId:'m5',dir:'UP'}, {blockId:'m4',dir:'RIGHT'}, {blockId:'m5',dir:'DOWN'}, {blockId:'m5',dir:'LEFT'}, {blockId:'m5',dir:'DOWN'}, {blockId:'m4',dir:'DOWN'}],
-  121: [{blockId:'m1',dir:'RIGHT'}],
-  122: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'}],
-  123: [{blockId:'m1',dir:'RIGHT'}],
+  121: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
+  122: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
+  123: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'}],
   124: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
-  125: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k1',dir:'DOWN'}],
+  125: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
   126: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k2',dir:'RIGHT'}],
 };
 

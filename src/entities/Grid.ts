@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CELL_SIZE, HUD_HEIGHT } from '../config/Constants';
 import { Block } from './Block';
-import { ExitZone, Color } from '../types/Game';
+import { ExitZone } from '../types/Game';
 import { TOKENS } from '../ui/Theme';
 
 export class Grid {
@@ -14,7 +14,7 @@ export class Grid {
   private occupancy: (Block | null)[][];
   private exits: ExitZone[] = [];
   private iceCells: Set<number> = new Set();
-  private unlockedColors: Set<Color> = new Set();
+  private exitCount: number = 0;
   private iceGraphics?: Phaser.GameObjects.Graphics;
   private createdObjects: Phaser.GameObjects.GameObject[] = [];
   private timers: Phaser.Time.TimerEvent[] = [];
@@ -87,12 +87,12 @@ export class Grid {
     return this.iceCells.has(row * this.cols + col);
   }
 
-  public unlockColor(color: Color): void {
-    this.unlockedColors.add(color);
+  public registerExit(): void {
+    this.exitCount++;
   }
 
-  public isColorUnlocked(color: Color): boolean {
-    return this.unlockedColors.has(color);
+  public getExitCount(): number {
+    return this.exitCount;
   }
 
   private drawBoard(scene: Phaser.Scene): void {

@@ -25,7 +25,7 @@ export class MovementSystem {
   public slide(block: Block, grid: Grid, dir: Direction, allBlocks: Block[]): SlideResult {
     if (block.removed) return { kind: 'invalid', reason: 'blocked' };
     if (block.type === 'obstacle') return { kind: 'invalid', reason: 'blocked' };
-    if (block.type === 'lock' && !grid.isColorUnlocked(block.color)) {
+    if (block.type === 'lock' && grid.getExitCount() < block.unlockAt) {
       return { kind: 'invalid', reason: 'locked' };
     }
     if (block.type === 'dependent' && !this.depsCleared(block, allBlocks)) {
@@ -53,6 +53,7 @@ export class MovementSystem {
           return { kind: 'exit', side, toCol: curCol, toRow: curRow, distance };
         }
         if (distance === 0) return { kind: 'invalid', reason: 'blocked' };
+        // Ice push: try to skip past edge (no exit) — fails because no cell beyond
         if (grid.hasIce(curCol, curRow)) return { kind: 'invalid', reason: 'ice_stop' };
         return { kind: 'slide', toCol: curCol, toRow: curRow, distance };
       }
@@ -61,13 +62,69 @@ export class MovementSystem {
       if (occ && occ !== block) {
         const distance = Math.abs(curCol - startCol) + Math.abs(curRow - startRow);
         if (distance === 0) return { kind: 'invalid', reason: 'blocked' };
-        if (grid.hasIce(curCol, curRow)) return { kind: 'invalid', reason: 'ice_stop' };
+        // Ice push: if natural stop is ice, try to skip past blocker
+        if (grid.hasIce(curCol, curRow)) {
+          const pushed = this.icePush(grid, curCol, curRow, nextCol, nextRow, dir, block, allBlocks);
+          if (pushed) {
+            const totalDist = Math.abs(pushed.toCol - startCol) + Math.abs(pushed.toRow - startRow);
+            if (pushed.exit) {
+              return { kind: 'exit', side: DIR_TO_SIDE[dir], toCol: pushed.toCol, toRow: pushed.toRow, distance: totalDist };
+            }
+            return { kind: 'slide', toCol: pushed.toCol, toRow: pushed.toRow, distance: totalDist };
+          }
+          return { kind: 'invalid', reason: 'ice_stop' };
+        }
         return { kind: 'slide', toCol: curCol, toRow: curRow, distance };
       }
 
       curCol = nextCol;
       curRow = nextRow;
     }
+  }
+
+  // Ice push: starting from ice cell at (curCol, curRow), try to jump past the blocker
+  // at (skipCol, skipRow). Lands at (skipCol+dx, skipRow+dy). Recurses if landing is ice.
+  // Returns null if push impossible.
+  private icePush(
+    grid: Grid,
+    curCol: number, curRow: number,
+    skipCol: number, skipRow: number,
+    dir: Direction,
+    self: Block, allBlocks: Block[],
+  ): { toCol: number; toRow: number; exit: boolean } | null {
+    void curCol; void curRow;
+    const [dx, dy] = DELTA[dir];
+    const landCol = skipCol + dx;
+    const landRow = skipRow + dy;
+    if (this.outOfGrid(landCol, landRow, grid)) {
+      const side = DIR_TO_SIDE[dir];
+      const exitIdx = side === 'LEFT' || side === 'RIGHT' ? skipRow : skipCol;
+      if (grid.hasExit(side, exitIdx)) {
+        return { toCol: skipCol, toRow: skipRow, exit: true };
+      }
+      return null;
+    }
+    const occ = grid.getOccupant(landCol, landRow);
+    if (occ && occ !== self) return null;
+    if (grid.hasIce(landCol, landRow)) {
+      // Recurse: from ice landing, try another push if there's another blocker ahead
+      const nextCol = landCol + dx;
+      const nextRow = landRow + dy;
+      if (this.outOfGrid(nextCol, nextRow, grid)) {
+        const side = DIR_TO_SIDE[dir];
+        const exitIdx = side === 'LEFT' || side === 'RIGHT' ? landRow : landCol;
+        if (grid.hasExit(side, exitIdx)) return { toCol: landCol, toRow: landRow, exit: true };
+        return null;
+      }
+      const nextOcc = grid.getOccupant(nextCol, nextRow);
+      if (nextOcc && nextOcc !== self) {
+        // chain push
+        return this.icePush(grid, landCol, landRow, nextCol, nextRow, dir, self, allBlocks);
+      }
+      // free cell after ice: normal slide would continue. End of push — return ice landing.
+      return { toCol: landCol, toRow: landRow, exit: false };
+    }
+    return { toCol: landCol, toRow: landRow, exit: false };
   }
 
   public constraintsOK(block: Block, dir: Direction): boolean {

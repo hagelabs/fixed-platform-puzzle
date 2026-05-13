@@ -12,6 +12,7 @@ export interface BlockData {
   direction?: Direction;
   dependsOn?: string;
   allowedExits?: ExitSide[];
+  unlockAt?: number;
 }
 
 export interface ExitZone {

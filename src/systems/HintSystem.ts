@@ -11,6 +11,7 @@ interface SolverBlock {
   pos: [number, number];
   direction?: Direction;
   dependsOn?: string;
+  unlockAt?: number;
 }
 
 interface SolverCtx {
@@ -87,6 +88,7 @@ function buildCtx(blocks: Block[], grid: Grid, iceCells: [number, number][]): So
       pos: [b.gridPos[0], b.gridPos[1]],
       direction: b.direction,
       dependsOn: b.dependsOn,
+      unlockAt: b.unlockAt,
     });
   }
   const iceSet = new Set<number>();
@@ -117,13 +119,13 @@ function exitAt(ctx: SolverCtx, side: ExitSide, idx: number): boolean {
 }
 
 function attempt(
-  ctx: SolverCtx, positions: Pos[], unlockedColors: Set<Color>, idx: number, dir: Direction,
-): { kind: 'slide' | 'exit'; nextX?: number; nextY?: number; exitedColor?: Color } | null {
+  ctx: SolverCtx, positions: Pos[], exitCount: number, idx: number, dir: Direction,
+): { kind: 'slide' | 'exit'; nextX?: number; nextY?: number } | null {
   const cur = positions[idx];
   if (!cur) return null;
   const block = ctx.blocks[idx];
 
-  if (block.type === 'lock' && !unlockedColors.has(block.color)) return null;
+  if (block.type === 'lock' && exitCount < (block.unlockAt ?? 0)) return null;
   if (block.type === 'dependent') {
     const p = ctx.depByIdx[idx];
     if (p >= 0 && positions[p] !== null) return null;
@@ -142,28 +144,33 @@ function attempt(
       const side = DIR_TO_SIDE[dir];
       const exitIdx = side === 'LEFT' || side === 'RIGHT' ? curR : curC;
       const dist = Math.abs(curC - sC) + Math.abs(curR - sR);
-      if (exitAt(ctx, side, exitIdx)) return { kind: 'exit', exitedColor: block.color };
+      if (exitAt(ctx, side, exitIdx)) return { kind: 'exit' };
       if (dist === 0) return null;
       if (ctx.iceSet.has(cellKey(curC, curR, ctx.cols))) return null;
       return { kind: 'slide', nextX: curC, nextY: curR };
     }
-    if (ctx.obstacleSet.has(cellKey(nC, nR, ctx.cols))) {
-      const dist = Math.abs(curC - sC) + Math.abs(curR - sR);
-      if (dist === 0) return null;
-      if (ctx.iceSet.has(cellKey(curC, curR, ctx.cols))) return null;
-      return { kind: 'slide', nextX: curC, nextY: curR };
-    }
-    let blocked = false;
-    for (let i = 0; i < positions.length; i++) {
-      if (i === idx) continue;
-      const p = positions[i];
-      if (!p) continue;
-      if (p[0] === nC && p[1] === nR) { blocked = true; break; }
+    const obstacleHere = ctx.obstacleSet.has(cellKey(nC, nR, ctx.cols));
+    let blocked = obstacleHere;
+    if (!blocked) {
+      for (let i = 0; i < positions.length; i++) {
+        if (i === idx) continue;
+        const p = positions[i];
+        if (!p) continue;
+        if (p[0] === nC && p[1] === nR) { blocked = true; break; }
+      }
     }
     if (blocked) {
       const dist = Math.abs(curC - sC) + Math.abs(curR - sR);
       if (dist === 0) return null;
-      if (ctx.iceSet.has(cellKey(curC, curR, ctx.cols))) return null;
+      // Ice push: try to skip past the blocker
+      if (ctx.iceSet.has(cellKey(curC, curR, ctx.cols))) {
+        const pushed = icePush(ctx, positions, idx, curC, curR, nC, nR, dir);
+        if (pushed) {
+          if (pushed.exit) return { kind: 'exit' };
+          return { kind: 'slide', nextX: pushed.col, nextY: pushed.row };
+        }
+        return null;
+      }
       return { kind: 'slide', nextX: curC, nextY: curR };
     }
     curC = nC;
@@ -171,11 +178,56 @@ function attempt(
   }
 }
 
-function stateKey(positions: Pos[], unlocked: Set<Color>): string {
+function icePush(
+  ctx: SolverCtx, positions: Pos[], selfIdx: number,
+  curC: number, curR: number, skipC: number, skipR: number, dir: Direction,
+): { col: number; row: number; exit: boolean } | null {
+  void curC; void curR;
+  const [dx, dy] = DELTA[dir];
+  const landC = skipC + dx;
+  const landR = skipR + dy;
+  if (landC < 0 || landC >= ctx.cols || landR < 0 || landR >= ctx.rows) {
+    const side = DIR_TO_SIDE[dir];
+    const exitIdx = side === 'LEFT' || side === 'RIGHT' ? skipR : skipC;
+    if (exitAt(ctx, side, exitIdx)) return { col: skipC, row: skipR, exit: true };
+    return null;
+  }
+  if (ctx.obstacleSet.has(cellKey(landC, landR, ctx.cols))) return null;
+  for (let i = 0; i < positions.length; i++) {
+    if (i === selfIdx) continue;
+    const p = positions[i];
+    if (!p) continue;
+    if (p[0] === landC && p[1] === landR) return null;
+  }
+  if (ctx.iceSet.has(cellKey(landC, landR, ctx.cols))) {
+    const nextC = landC + dx;
+    const nextR = landR + dy;
+    if (nextC < 0 || nextC >= ctx.cols || nextR < 0 || nextR >= ctx.rows) {
+      const side = DIR_TO_SIDE[dir];
+      const exitIdx = side === 'LEFT' || side === 'RIGHT' ? landR : landC;
+      if (exitAt(ctx, side, exitIdx)) return { col: landC, row: landR, exit: true };
+      return null;
+    }
+    const nextObs = ctx.obstacleSet.has(cellKey(nextC, nextR, ctx.cols));
+    let nextBlocked = nextObs;
+    if (!nextBlocked) {
+      for (let i = 0; i < positions.length; i++) {
+        if (i === selfIdx) continue;
+        const p = positions[i];
+        if (!p) continue;
+        if (p[0] === nextC && p[1] === nextR) { nextBlocked = true; break; }
+      }
+    }
+    if (nextBlocked) return icePush(ctx, positions, selfIdx, landC, landR, nextC, nextR, dir);
+    return { col: landC, row: landR, exit: false };
+  }
+  return { col: landC, row: landR, exit: false };
+}
+
+function stateKey(positions: Pos[], exitCount: number): string {
   let s = '';
   for (const p of positions) s += p ? `${p[0]},${p[1]}|` : 'X|';
-  const colors: Color[] = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
-  for (const c of colors) s += unlocked.has(c) ? '1' : '0';
+  s += `#${exitCount}`;
   return s;
 }
 
@@ -212,14 +264,11 @@ export function suggestMove(
   if (ctx.blocks.length === 0) return null;
 
   const init: Pos[] = ctx.blocks.map((b) => [b.pos[0], b.pos[1]]);
-  const initUnlocked = new Set<Color>();
-  // seed unlocked from grid's current state
-  const COLOR_LIST: Color[] = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
-  for (const c of COLOR_LIST) if (grid.isColorUnlocked(c)) initUnlocked.add(c);
+  const initExitCount = grid.getExitCount();
 
-  const initKey = stateKey(init, initUnlocked);
-  const open = new MinHeap<{ p: Pos[]; u: Set<Color>; g: number; key: string }>();
-  open.push({ p: init, u: initUnlocked, g: 0, key: initKey }, heuristic(ctx, init));
+  const initKey = stateKey(init, initExitCount);
+  const open = new MinHeap<{ p: Pos[]; e: number; g: number; key: string }>();
+  open.push({ p: init, e: initExitCount, g: 0, key: initKey }, heuristic(ctx, init));
   const seen = new Map<string, number>();
   seen.set(initKey, 0);
 
@@ -251,26 +300,23 @@ export function suggestMove(
     for (let i = 0; i < cur.p.length; i++) {
       if (!cur.p[i]) continue;
       for (const d of DIRS) {
-        const r = attempt(ctx, cur.p, cur.u, i, d);
+        const r = attempt(ctx, cur.p, cur.e, i, d);
         if (!r) continue;
         const next: Pos[] = cur.p.slice();
-        let nextU = cur.u;
+        let nextE = cur.e;
         if (r.kind === 'exit') {
           next[i] = null;
-          if (r.exitedColor && !cur.u.has(r.exitedColor)) {
-            nextU = new Set(cur.u);
-            nextU.add(r.exitedColor);
-          }
+          nextE++;
         } else {
           next[i] = [r.nextX!, r.nextY!];
         }
-        const nk = stateKey(next, nextU);
+        const nk = stateKey(next, nextE);
         const ng = cur.g + 1;
         const prev = seen.get(nk);
         if (prev !== undefined && prev <= ng) continue;
         seen.set(nk, ng);
         parents.set(nk, { parent: cur.key, move: { blockId: ctx.blocks[i].id, dir: d } });
-        open.push({ p: next, u: nextU, g: ng, key: nk }, ng + heuristic(ctx, next));
+        open.push({ p: next, e: nextE, g: ng, key: nk }, ng + heuristic(ctx, next));
       }
     }
   }

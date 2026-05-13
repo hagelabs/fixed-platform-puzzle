@@ -686,7 +686,7 @@ export class GameScene extends Phaser.Scene {
         screenshake(this, 0.005, 110);
       },
       () => {
-        this.grid.unlockColor(block.color);
+        this.grid.registerExit();
         this.refreshDependents();
         this.afterRemove();
         this.busy = false;

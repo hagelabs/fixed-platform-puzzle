@@ -12,7 +12,10 @@ module.exports = (env, argv) => {
   const analyze = !!env?.analyze;
   const VALID_TARGETS = ['itch', 'poki', 'crazygames', 'gamedistribution'];
   const requested = env?.target;
-  const buildTarget = VALID_TARGETS.includes(requested) ? requested : 'platform';
+  // Dev mode: default to 'itch' (no SDK script loaded, no Poki/CG init) for clean localhost.
+  // Production: default to 'platform' (runtime hostname detection between Poki/CG).
+  const defaultTarget = isProduction ? 'platform' : 'itch';
+  const buildTarget = VALID_TARGETS.includes(requested) ? requested : defaultTarget;
 
   const plugins = [
     new HtmlWebpackPlugin({

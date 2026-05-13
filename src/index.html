@@ -206,6 +206,11 @@
         f.parentNode.insertBefore(t, f);
       })(document, "script");
     </script>
+    <% } else if (BUILD_TARGET === 'playgama') { %>
+    <script
+      src="https://bridge.playgama.com/v1/stable/playgama-bridge.js"
+      onerror="console.info('[SDK] playgama bridge not loaded')"
+    ></script>
     <% } else if (BUILD_TARGET === 'platform') { %>
     <script>
       (function loadSDK(src) {

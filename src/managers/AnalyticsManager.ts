@@ -34,6 +34,18 @@ interface GDSDKShape {
   preloadAd?: (...args: unknown[]) => void;
   showAd?: (...args: unknown[]) => void;
 }
+interface PlaygamaBridgeShape {
+  platform?: {
+    sendMessage?: (msg: string, params?: object) => unknown;
+  };
+}
+
+const PLAYGAMA_MESSAGE_MAP: Partial<Record<EventName, string>> = {
+  level_started: 'level_started',
+  level_completed: 'level_completed',
+  level_failed: 'level_failed',
+  pack_cleared: 'player_got_achievement',
+};
 
 class AnalyticsManagerImpl {
   private buffer: AnalyticsEvent[] = [];
@@ -65,6 +77,7 @@ class AnalyticsManagerImpl {
       PokiSDK?: PokiSDKShape;
       CrazyGames?: { SDK?: { analytics?: CGAnalyticsShape } };
       gdsdk?: GDSDKShape;
+      bridge?: PlaygamaBridgeShape;
     };
 
     if (this.target === 'poki' && w.PokiSDK?.customEvent) {
@@ -76,6 +89,11 @@ class AnalyticsManagerImpl {
     }
     if (this.target === 'crazygames' && w.CrazyGames?.SDK?.analytics?.trackEvent) {
       w.CrazyGames.SDK.analytics.trackEvent(name, meta || {});
+      return;
+    }
+    if (this.target === 'playgama' && w.bridge?.platform?.sendMessage) {
+      const msg = PLAYGAMA_MESSAGE_MAP[name];
+      if (msg) w.bridge.platform.sendMessage(msg, meta || {});
       return;
     }
     // itch / gamedistribution / dev: console-only

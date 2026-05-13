@@ -10,7 +10,7 @@ const zlib = require('zlib');
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
   const analyze = !!env?.analyze;
-  const VALID_TARGETS = ['itch', 'poki', 'crazygames', 'gamedistribution'];
+  const VALID_TARGETS = ['itch', 'poki', 'crazygames', 'gamedistribution', 'playgama'];
   const requested = env?.target;
   // Dev mode: default to 'itch' (no SDK script loaded, no Poki/CG init) for clean localhost.
   // Production: default to 'platform' (runtime hostname detection between Poki/CG).
@@ -43,6 +43,14 @@ module.exports = (env, argv) => {
           from: path.resolve(__dirname, 'marketing/TemplateData/logo.png'),
           to: path.resolve(__dirname, 'dist/logo.png'),
         },
+        ...(buildTarget === 'playgama'
+          ? [
+              {
+                from: path.resolve(__dirname, 'playgama-bridge-config.json'),
+                to: path.resolve(__dirname, 'dist/playgama-bridge-config.json'),
+              },
+            ]
+          : []),
       ],
     }),
   ];

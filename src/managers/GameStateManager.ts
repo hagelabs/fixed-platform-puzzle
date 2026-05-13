@@ -6,6 +6,7 @@ declare const __DEV__: boolean;
 const DEV = typeof __DEV__ !== 'undefined' && __DEV__;
 
 export const WATCH_COOLDOWN_MS = 3 * 60 * 1000;
+export const PERSIST_KEY = 'fpp-game-state-v2';
 
 export type StarCount = 1 | 2 | 3;
 
@@ -42,6 +43,75 @@ interface GameState {
   startWatchCooldown: () => void;
   isWatchOnCooldown: () => boolean;
   getWatchCooldownSecondsLeft: () => number;
+}
+
+export function persistedSlice(s: GameState): Record<string, unknown> {
+  return {
+    currentLevel: s.currentLevel,
+    unlockedLevel: s.unlockedLevel,
+    sfxEnabled: s.sfxEnabled,
+    audioEnabled: s.audioEnabled,
+    tutorialSeenLevels: s.tutorialSeenLevels,
+    bestStars: s.bestStars,
+    equippedPalette: s.equippedPalette,
+    watchCooldownUntil: s.watchCooldownUntil,
+  };
+}
+
+interface CloudSnapshot {
+  currentLevel?: number;
+  unlockedLevel?: number;
+  sfxEnabled?: boolean;
+  audioEnabled?: boolean;
+  tutorialSeenLevels?: number[];
+  bestStars?: Record<string, StarCount>;
+  equippedPalette?: string;
+  watchCooldownUntil?: number;
+}
+
+export function mergeCloudSnapshot(cloud: unknown): boolean {
+  if (!cloud || typeof cloud !== 'object') return false;
+  // Zustand persist serializes as { state: {...}, version: n }
+  const root = cloud as { state?: CloudSnapshot } & CloudSnapshot;
+  const snap: CloudSnapshot = root.state ?? root;
+  const cur = store.getState();
+
+  const cloudStars = snap.bestStars
+    ? Object.values(snap.bestStars).reduce((a, b) => a + (b as number), 0)
+    : 0;
+  const localStars = cur.totalStars();
+  const cloudUnlock = snap.unlockedLevel ?? 0;
+  const cloudWins = cloudUnlock > cur.unlockedLevel || cloudStars > localStars;
+  if (!cloudWins) return false;
+
+  const patch: Partial<GameState> = {};
+  if (typeof snap.unlockedLevel === 'number') {
+    patch.unlockedLevel = Math.max(cur.unlockedLevel, snap.unlockedLevel);
+  }
+  if (typeof snap.currentLevel === 'number') {
+    patch.currentLevel = Math.max(cur.currentLevel, snap.currentLevel);
+  }
+  if (Array.isArray(snap.tutorialSeenLevels)) {
+    const set = new Set<number>([...cur.tutorialSeenLevels, ...snap.tutorialSeenLevels]);
+    patch.tutorialSeenLevels = [...set];
+  }
+  if (snap.bestStars && typeof snap.bestStars === 'object') {
+    const merged: Record<number, StarCount> = { ...cur.bestStars };
+    for (const [k, v] of Object.entries(snap.bestStars)) {
+      const id = Number(k);
+      if (!Number.isFinite(id)) continue;
+      const prev = merged[id] ?? 0;
+      const next = Math.max(prev, v as number) as StarCount;
+      if (next !== prev) merged[id] = next;
+    }
+    patch.bestStars = merged;
+  }
+  if (typeof snap.equippedPalette === 'string') {
+    patch.equippedPalette = snap.equippedPalette;
+  }
+  if (Object.keys(patch).length === 0) return false;
+  store.setState(patch);
+  return true;
 }
 
 const store = createStore<GameState>()(
@@ -117,18 +187,9 @@ const store = createStore<GameState>()(
       },
     }),
     {
-      name: 'fpp-game-state-v2',
+      name: PERSIST_KEY,
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({
-        currentLevel: s.currentLevel,
-        unlockedLevel: s.unlockedLevel,
-        sfxEnabled: s.sfxEnabled,
-        audioEnabled: s.audioEnabled,
-        tutorialSeenLevels: s.tutorialSeenLevels,
-        bestStars: s.bestStars,
-        equippedPalette: s.equippedPalette,
-        watchCooldownUntil: s.watchCooldownUntil,
-      }) as Partial<GameState>,
+      partialize: (s) => persistedSlice(s) as Partial<GameState>,
       migrate: (persisted: unknown) => {
         if (persisted && typeof persisted === 'object') {
           const p = persisted as Record<string, unknown>;

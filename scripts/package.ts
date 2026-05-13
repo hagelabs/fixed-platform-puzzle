@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const root = resolve(__dirname, '..');
 
-const VALID_TARGETS = ['itch', 'poki', 'crazygames', 'gamedistribution'] as const;
+const VALID_TARGETS = ['itch', 'poki', 'crazygames', 'gamedistribution', 'playgama'] as const;
 type Target = (typeof VALID_TARGETS)[number];
 
 const MAX_ZIP_BYTES = 20 * 1024 * 1024;

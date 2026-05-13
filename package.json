@@ -14,6 +14,7 @@
     "package:poki": "tsx scripts/package.ts poki",
     "package:crazygames": "tsx scripts/package.ts crazygames",
     "package:gamedistribution": "tsx scripts/package.ts gamedistribution",
+    "package:playgama": "tsx scripts/package.ts playgama",
     "package:itch": "tsx scripts/package.ts itch",
     "release": "tsx scripts/release.ts"
   },

@@ -1,7 +1,52 @@
 import { AudioManager } from './AudioManager';
 
-type Platform = 'poki' | 'crazygames' | 'gamedistribution' | 'none';
+type Platform = 'poki' | 'crazygames' | 'gamedistribution' | 'playgama' | 'none';
 type RewardedSize = 'small' | 'medium' | 'large';
+
+type PlaygamaMessage =
+  | 'game_ready'
+  | 'in_game_loading_started'
+  | 'in_game_loading_stopped'
+  | 'level_started'
+  | 'level_completed'
+  | 'level_failed'
+  | 'level_paused'
+  | 'level_resumed'
+  | 'player_got_achievement';
+
+type PlaygamaAdState = 'loading' | 'opened' | 'closed' | 'rewarded' | 'failed';
+
+interface PlaygamaBridge {
+  initialize?: () => Promise<void>;
+  EVENT_NAME?: {
+    INTERSTITIAL_STATE_CHANGED?: string;
+    REWARDED_STATE_CHANGED?: string;
+    PAUSE_STATE_CHANGED?: string;
+    AUDIO_STATE_CHANGED?: string;
+  };
+  platform?: {
+    id?: string;
+    language?: string;
+    isPaused?: boolean;
+    isAudioEnabled?: boolean;
+    sendMessage?: (msg: PlaygamaMessage, params?: object) => Promise<void> | void;
+    on?: (event: string, cb: (...args: unknown[]) => void) => void;
+    off?: (event: string, cb: (...args: unknown[]) => void) => void;
+  };
+  advertisement?: {
+    isInterstitialSupported?: boolean;
+    isRewardedSupported?: boolean;
+    showInterstitial?: (placement?: string) => void;
+    showRewarded?: (placement?: string) => void;
+    on?: (event: string, cb: (state: PlaygamaAdState) => void) => void;
+    off?: (event: string, cb: (state: PlaygamaAdState) => void) => void;
+  };
+  storage?: {
+    get?: (key: string | string[]) => Promise<unknown>;
+    set?: (key: string | string[], value: unknown) => Promise<void> | void;
+    delete?: (key: string | string[]) => Promise<void> | void;
+  };
+}
 
 interface PokiAPI {
   init?: () => Promise<void>;
@@ -43,6 +88,7 @@ declare global {
     CrazyGames?: CrazyAPI;
     gdsdk?: GDSDK;
     GD_OPTIONS?: { gameId?: string };
+    bridge?: PlaygamaBridge;
   }
 }
 
@@ -59,11 +105,13 @@ class SDKManagerImpl {
       if (__BUILD_TARGET__ === 'poki') return 'poki';
       if (__BUILD_TARGET__ === 'crazygames') return 'crazygames';
       if (__BUILD_TARGET__ === 'gamedistribution') return 'gamedistribution';
+      if (__BUILD_TARGET__ === 'playgama') return 'playgama';
     }
     const host = window.location.hostname;
     if (host.includes('poki') || window.PokiSDK) return 'poki';
     if (host.includes('crazygames') || window.CrazyGames) return 'crazygames';
     if (host.includes('gamedistribution') || window.gdsdk) return 'gamedistribution';
+    if (host.includes('playgama') || window.bridge) return 'playgama';
     return 'none';
   }
 
@@ -72,7 +120,68 @@ class SDKManagerImpl {
   }
 
   hasRewardedAds(): boolean {
-    return this.platform === 'poki' || this.platform === 'crazygames' || this.platform === 'gamedistribution';
+    return (
+      this.platform === 'poki' ||
+      this.platform === 'crazygames' ||
+      this.platform === 'gamedistribution' ||
+      this.platform === 'playgama'
+    );
+  }
+
+  hasCloudStorage(): boolean {
+    return this.platform === 'playgama' && !!window.bridge?.storage?.get;
+  }
+
+  async cloudLoad(key: string): Promise<unknown> {
+    if (!this.hasCloudStorage()) return null;
+    try {
+      const get = window.bridge?.storage?.get;
+      if (!get) return null;
+      const raw = await get(key);
+      if (raw == null) return null;
+      if (typeof raw === 'string') {
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return raw;
+        }
+      }
+      return raw;
+    } catch (e) {
+      console.warn('[cloud] load failed', e);
+      return null;
+    }
+  }
+
+  cloudSave(key: string, value: unknown): void {
+    if (!this.hasCloudStorage()) return;
+    const set = window.bridge?.storage?.set;
+    if (!set) return;
+    try {
+      const payload = typeof value === 'string' ? value : JSON.stringify(value);
+      const result = set(key, payload);
+      if (result && typeof (result as Promise<void>).catch === 'function') {
+        (result as Promise<void>).catch((e) => console.warn('[cloud] save rejected', e));
+      }
+    } catch (e) {
+      console.warn('[cloud] save threw', e);
+    }
+  }
+
+  onPauseChanged(cb: (paused: boolean) => void): void {
+    if (this.platform !== 'playgama') return;
+    const platform = window.bridge?.platform;
+    const evt = window.bridge?.EVENT_NAME?.PAUSE_STATE_CHANGED;
+    if (!platform?.on || !evt) return;
+    platform.on(evt, () => cb(!!platform.isPaused));
+  }
+
+  onAudioChanged(cb: (enabled: boolean) => void): void {
+    if (this.platform !== 'playgama') return;
+    const platform = window.bridge?.platform;
+    const evt = window.bridge?.EVENT_NAME?.AUDIO_STATE_CHANGED;
+    if (!platform?.on || !evt) return;
+    platform.on(evt, () => cb(platform.isAudioEnabled !== false));
   }
 
   async init(): Promise<void> {
@@ -86,6 +195,12 @@ class SDKManagerImpl {
       } else if (this.platform === 'gamedistribution') {
         // SDK auto-inits via GD_OPTIONS in HTML; nothing to await
         await this.waitFor(() => !!window.gdsdk, 2000);
+      } else if (this.platform === 'playgama') {
+        await this.waitFor(() => !!window.bridge?.initialize, 3000);
+        if (window.bridge?.initialize) {
+          await window.bridge.initialize();
+          window.bridge.platform?.sendMessage?.('in_game_loading_started');
+        }
       }
       this.ready = true;
       console.info('[SDK]', this.platform, 'ready');
@@ -98,16 +213,26 @@ class SDKManagerImpl {
     if (!this.ready) return;
     window.PokiSDK?.gameLoadingFinished?.();
     window.CrazyGames?.SDK?.game?.loadingStop?.();
+    if (this.platform === 'playgama') {
+      window.bridge?.platform?.sendMessage?.('in_game_loading_stopped');
+      window.bridge?.platform?.sendMessage?.('game_ready');
+    }
   }
 
   gameplayStart(): void {
     window.PokiSDK?.gameplayStart?.();
     window.CrazyGames?.SDK?.game?.gameplayStart?.();
+    if (this.platform === 'playgama') {
+      window.bridge?.platform?.sendMessage?.('level_started');
+    }
   }
 
   gameplayStop(): void {
     window.PokiSDK?.gameplayStop?.();
     window.CrazyGames?.SDK?.game?.gameplayStop?.();
+    if (this.platform === 'playgama') {
+      window.bridge?.platform?.sendMessage?.('level_paused');
+    }
   }
 
   happytime(): void {
@@ -146,6 +271,9 @@ class SDKManagerImpl {
       } else if (this.platform === 'gamedistribution' && window.gdsdk?.showAd) {
         this.gameplayStop();
         await this.withTimeout(window.gdsdk.showAd(), undefined);
+      } else if (this.platform === 'playgama' && window.bridge?.advertisement?.showInterstitial) {
+        this.gameplayStop();
+        await this.withTimeout(this.playgamaInterstitial(), undefined);
       }
     } catch (e) {
       console.warn('[ad] commercialBreak failed', e);
@@ -175,6 +303,9 @@ class SDKManagerImpl {
         await this.withTimeout(window.gdsdk.showAd('rewarded'), undefined);
         return true;
       }
+      if (this.platform === 'playgama' && window.bridge?.advertisement?.showRewarded) {
+        return await this.withTimeout(this.playgamaRewarded(), false);
+      }
       return await this.dummyRewarded();
     } catch (e) {
       console.warn('[ad] rewarded failed', e);
@@ -198,6 +329,62 @@ class SDKManagerImpl {
 
   private dummyRewarded(): Promise<boolean> {
     return new Promise((resolve) => setTimeout(() => resolve(true), 700));
+  }
+
+  private playgamaInterstitial(): Promise<void> {
+    const ad = window.bridge?.advertisement;
+    const evt = window.bridge?.EVENT_NAME?.INTERSTITIAL_STATE_CHANGED;
+    const show = ad?.showInterstitial;
+    const on = ad?.on;
+    const off = ad?.off;
+    if (!ad || !show || !on || !evt) {
+      show?.();
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const onState = (state: PlaygamaAdState): void => {
+        if (state !== 'closed' && state !== 'failed') return;
+        if (settled) return;
+        settled = true;
+        off?.(evt, onState);
+        resolve();
+      };
+      on(evt, onState);
+      show();
+    });
+  }
+
+  private playgamaRewarded(): Promise<boolean> {
+    const ad = window.bridge?.advertisement;
+    const evt = window.bridge?.EVENT_NAME?.REWARDED_STATE_CHANGED;
+    const show = ad?.showRewarded;
+    const on = ad?.on;
+    const off = ad?.off;
+    if (!ad || !show || !on || !evt) {
+      show?.();
+      return Promise.resolve(false);
+    }
+    return new Promise<boolean>((resolve) => {
+      let rewarded = false;
+      let settled = false;
+      const finish = (result: boolean): void => {
+        if (settled) return;
+        settled = true;
+        off?.(evt, onState);
+        resolve(result);
+      };
+      const onState = (state: PlaygamaAdState): void => {
+        if (state === 'rewarded') {
+          rewarded = true;
+          return;
+        }
+        if (state === 'closed') finish(rewarded);
+        else if (state === 'failed') finish(false);
+      };
+      on(evt, onState);
+      show();
+    });
   }
 
   private waitFor(cond: () => boolean, ms: number): Promise<void> {

@@ -3,7 +3,7 @@ import { gameConfig } from './config/GameConfig';
 import { SDKManager } from './managers/SDKManager';
 import { Analytics } from './managers/AnalyticsManager';
 import { AudioManager } from './managers/AudioManager';
-import { useGameStore } from './managers/GameStateManager';
+import { useGameStore, PERSIST_KEY, persistedSlice, mergeCloudSnapshot } from './managers/GameStateManager';
 
 declare const __BUILD_TARGET__: string;
 declare const __DEV__: boolean;
@@ -78,6 +78,37 @@ function installFullscreenAutoTrigger(game: Phaser.Game): void {
   });
 }
 
+function installCloudWriter(): void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  useGameStore.subscribe(() => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      const slice = persistedSlice(useGameStore.getState());
+      // Wrap in zustand-persist-shaped envelope so reload merges cleanly.
+      SDKManager.cloudSave(PERSIST_KEY, { state: slice, version: 0 });
+    }, 800);
+  });
+}
+
+function installPlaygamaListeners(game: Phaser.Game): void {
+  SDKManager.onPauseChanged((paused) => {
+    AudioManager.duckForAd(paused);
+    if (paused) {
+      game.scene.scenes.forEach((s) => {
+        if (s.scene.isActive()) game.scene.pause(s.scene.key);
+      });
+    } else {
+      game.scene.scenes.forEach((s) => {
+        if (s.scene.isPaused()) game.scene.resume(s.scene.key);
+      });
+    }
+  });
+  SDKManager.onAudioChanged((enabled) => {
+    AudioManager.duckForAd(!enabled);
+  });
+}
+
 function installAudioUnlock(): void {
   const unlock = (): void => {
     AudioManager.unlock();
@@ -108,10 +139,23 @@ window.addEventListener('load', async () => {
   const fontPromise = waitForFonts().then(() => emitProgress(75, 'Preparing assets...'));
   await Promise.all([sdkPromise, fontPromise]);
 
+  if (SDKManager.hasCloudStorage()) {
+    try {
+      const cloud = await SDKManager.cloudLoad(PERSIST_KEY);
+      if (cloud && mergeCloudSnapshot(cloud)) {
+        console.info('[cloud] merged remote save');
+      }
+    } catch (e) {
+      console.warn('[cloud] load skipped', e);
+    }
+    installCloudWriter();
+  }
+
   emitProgress(90, 'Starting game...');
   Analytics.log('session_start', { platform: SDKManager.getPlatform() });
   const game = new Phaser.Game(gameConfig);
   installFullscreenAutoTrigger(game);
+  installPlaygamaListeners(game);
 
   game.events.once('ready', () => emitReady());
   // Fallback: emit ready when first scene becomes active.

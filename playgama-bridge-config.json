@@ -1,15 +1,3 @@
 {
-  "version": "1.0.0",
-  "platforms": {},
-  "advertisement": {
-    "interstitial": {
-      "minimumDelay": 60
-    },
-    "rewarded": {
-      "placements": ["continue", "hint", "unlock_all"]
-    }
-  },
-  "payments": {
-    "purchases": []
-  }
+  "payments": []
 }

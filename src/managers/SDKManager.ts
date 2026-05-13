@@ -135,9 +135,9 @@ class SDKManagerImpl {
   async cloudLoad(key: string): Promise<unknown> {
     if (!this.hasCloudStorage()) return null;
     try {
-      const get = window.bridge?.storage?.get;
-      if (!get) return null;
-      const raw = await get(key);
+      const storage = window.bridge?.storage;
+      if (!storage?.get) return null;
+      const raw = await storage.get(key);
       if (raw == null) return null;
       if (typeof raw === 'string') {
         try {
@@ -155,11 +155,11 @@ class SDKManagerImpl {
 
   cloudSave(key: string, value: unknown): void {
     if (!this.hasCloudStorage()) return;
-    const set = window.bridge?.storage?.set;
-    if (!set) return;
+    const storage = window.bridge?.storage;
+    if (!storage?.set) return;
     try {
       const payload = typeof value === 'string' ? value : JSON.stringify(value);
-      const result = set(key, payload);
+      const result = storage.set(key, payload);
       if (result && typeof (result as Promise<void>).catch === 'function') {
         (result as Promise<void>).catch((e) => console.warn('[cloud] save rejected', e));
       }
@@ -257,7 +257,7 @@ class SDKManagerImpl {
 
   // Poki spec: call BEFORE gameplayStart() at natural breaks (level start).
   // Wraps platform call. Stops gameplay during ad, resumes after.
-  async commercialBreak(): Promise<void> {
+  async commercialBreak(placement = 'pre_level'): Promise<void> {
     if (this.adInFlight) return;
     this.adInFlight = true;
     AudioManager.duckForAd(true);
@@ -273,7 +273,7 @@ class SDKManagerImpl {
         await this.withTimeout(window.gdsdk.showAd(), undefined);
       } else if (this.platform === 'playgama' && window.bridge?.advertisement?.showInterstitial) {
         this.gameplayStop();
-        await this.withTimeout(this.playgamaInterstitial(), undefined);
+        await this.withTimeout(this.playgamaInterstitial(placement), undefined);
       }
     } catch (e) {
       console.warn('[ad] commercialBreak failed', e);
@@ -283,7 +283,7 @@ class SDKManagerImpl {
     }
   }
 
-  async rewarded(size: RewardedSize = 'medium'): Promise<boolean> {
+  async rewarded(size: RewardedSize = 'medium', placement = 'rewarded'): Promise<boolean> {
     if (this.adInFlight) return false;
     this.adInFlight = true;
     AudioManager.duckForAd(true);
@@ -304,7 +304,7 @@ class SDKManagerImpl {
         return true;
       }
       if (this.platform === 'playgama' && window.bridge?.advertisement?.showRewarded) {
-        return await this.withTimeout(this.playgamaRewarded(), false);
+        return await this.withTimeout(this.playgamaRewarded(placement), false);
       }
       return await this.dummyRewarded();
     } catch (e) {
@@ -331,14 +331,12 @@ class SDKManagerImpl {
     return new Promise((resolve) => setTimeout(() => resolve(true), 700));
   }
 
-  private playgamaInterstitial(): Promise<void> {
+  private playgamaInterstitial(placement = 'pre_level'): Promise<void> {
     const ad = window.bridge?.advertisement;
     const evt = window.bridge?.EVENT_NAME?.INTERSTITIAL_STATE_CHANGED;
-    const show = ad?.showInterstitial;
-    const on = ad?.on;
-    const off = ad?.off;
-    if (!ad || !show || !on || !evt) {
-      show?.();
+    if (!ad?.showInterstitial) return Promise.resolve();
+    if (!ad.on || !evt) {
+      ad.showInterstitial(placement);
       return Promise.resolve();
     }
     return new Promise<void>((resolve) => {
@@ -347,22 +345,20 @@ class SDKManagerImpl {
         if (state !== 'closed' && state !== 'failed') return;
         if (settled) return;
         settled = true;
-        off?.(evt, onState);
+        ad.off?.(evt, onState);
         resolve();
       };
-      on(evt, onState);
-      show();
+      ad.on!(evt, onState);
+      ad.showInterstitial!(placement);
     });
   }
 
-  private playgamaRewarded(): Promise<boolean> {
+  private playgamaRewarded(placement = 'rewarded'): Promise<boolean> {
     const ad = window.bridge?.advertisement;
     const evt = window.bridge?.EVENT_NAME?.REWARDED_STATE_CHANGED;
-    const show = ad?.showRewarded;
-    const on = ad?.on;
-    const off = ad?.off;
-    if (!ad || !show || !on || !evt) {
-      show?.();
+    if (!ad?.showRewarded) return Promise.resolve(false);
+    if (!ad.on || !evt) {
+      ad.showRewarded(placement);
       return Promise.resolve(false);
     }
     return new Promise<boolean>((resolve) => {
@@ -371,7 +367,7 @@ class SDKManagerImpl {
       const finish = (result: boolean): void => {
         if (settled) return;
         settled = true;
-        off?.(evt, onState);
+        ad.off?.(evt, onState);
         resolve(result);
       };
       const onState = (state: PlaygamaAdState): void => {
@@ -382,8 +378,8 @@ class SDKManagerImpl {
         if (state === 'closed') finish(rewarded);
         else if (state === 'failed') finish(false);
       };
-      on(evt, onState);
-      show();
+      ad.on!(evt, onState);
+      ad.showRewarded!(placement);
     });
   }
 

@@ -356,13 +356,12 @@ function inferPhase(idx: number, par: number, side: ExitSide): Phase {
     obstacles = par <= 12 ? 3 : par <= 15 ? 4 : 5;
     depthMode = 'linear';
   } else if (pack === 'stones') {
-    // obstacle-heavy, par 14-22
-    movables = par <= 17 ? 4 : 5;
+    // Brief targets: 14-22. Obstacle-heavy theme. No-under-par.
+    movables = par <= 16 ? 4 : 5;
     yellows = 1;
-    deps = par <= 16 ? 1 : 2;
-    obstacles = par <= 16 ? 3 : par <= 19 ? 4 : 5;
-    depthMode = deps >= 2 ? 'mixed' : 'linear';
-    if (par >= 20) exits = 2;
+    deps = par <= 15 ? 2 : 3;
+    obstacles = par <= 15 ? 5 : par <= 18 ? 6 : 7;
+    depthMode = 'linear';
   } else {
     // master (L64-72): mixed mastery, par 18-23
     movables = 5;
@@ -373,9 +372,9 @@ function inferPhase(idx: number, par: number, side: ExitSide): Phase {
     if (par >= 21) exits = 2;
   }
 
-  // Gears: NO-UNDER-PAR. optMin = par (strict floor), optMax = par+3 (slight over OK).
+  // Gears + Stones: NO-UNDER-PAR. optMin = par (strict floor), optMax = par+3 (slight over OK).
   // Tutorial + Hook: tight band (must hit brief par within ±1-2).
-  if (pack === 'gears') {
+  if (pack === 'gears' || pack === 'stones') {
     return { cols, rows, movables, yellows, deps, obstacles, exits, optMin: par, optMax: par + 3, depthMode, primarySide: side };
   }
   const tight = pack === 'tutorial' || pack === 'hook';
@@ -708,12 +707,21 @@ function bakeIds(ids: number[], existingSigs: Set<string>): Map<number, BakedLev
   const out = new Map<number, BakedLevel>();
   for (const id of ids) {
     const phase = getPhase(id);
+    const pack = packOfId(id);
+    const noFallback = pack === 'gears' || pack === 'stones';
     let chosen: BakedLevel | null = null;
-    const passes: { maxAttempts: number; budget: number; depth: number; strict: boolean }[] = [
-      { maxAttempts: 200, budget: 40000, depth: 50, strict: true },
-      { maxAttempts: 200, budget: 80000, depth: 60, strict: true },
-      { maxAttempts: 300, budget: 120000, depth: 70, strict: false },
-    ];
+    // Tight packs (no-under-par): drop pass-3 non-strict fallback; expand strict passes instead.
+    const passes: { maxAttempts: number; budget: number; depth: number; strict: boolean }[] = noFallback
+      ? [
+          { maxAttempts: 400, budget: 80000, depth: 60, strict: true },
+          { maxAttempts: 400, budget: 160000, depth: 80, strict: true },
+          { maxAttempts: 600, budget: 240000, depth: 100, strict: true },
+        ]
+      : [
+          { maxAttempts: 200, budget: 40000, depth: 50, strict: true },
+          { maxAttempts: 200, budget: 80000, depth: 60, strict: true },
+          { maxAttempts: 300, budget: 120000, depth: 70, strict: false },
+        ];
 
     outer:
     for (const pass of passes) {

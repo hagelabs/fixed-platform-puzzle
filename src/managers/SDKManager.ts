@@ -342,6 +342,7 @@ class SDKManagerImpl {
     return new Promise<void>((resolve) => {
       let settled = false;
       const onState = (state: PlaygamaAdState): void => {
+        console.info('[playgama] interstitial state:', state);
         if (state !== 'closed' && state !== 'failed') return;
         if (settled) return;
         settled = true;
@@ -364,19 +365,25 @@ class SDKManagerImpl {
     return new Promise<boolean>((resolve) => {
       let rewarded = false;
       let settled = false;
-      const finish = (result: boolean): void => {
+      const finalize = (result: boolean): void => {
         if (settled) return;
         settled = true;
         ad.off?.(evt, onState);
         resolve(result);
       };
       const onState = (state: PlaygamaAdState): void => {
+        console.info('[playgama] rewarded state:', state);
         if (state === 'rewarded') {
+          // Per Playgama spec: grant only when this state fires before 'closed'.
           rewarded = true;
           return;
         }
-        if (state === 'closed') finish(rewarded);
-        else if (state === 'failed') finish(false);
+        if (state === 'closed') {
+          // If 'rewarded' did not fire before 'closed', user dismissed early — no grant.
+          finalize(rewarded);
+          return;
+        }
+        if (state === 'failed') finalize(false);
       };
       ad.on!(evt, onState);
       ad.showRewarded!(placement);

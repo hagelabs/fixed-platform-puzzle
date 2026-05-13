@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-05-13T04:50:06.318Z",
+  "updated": "2026-05-13T05:54:28.133Z",
   "levels": {
     "1": {
       "id": 1,
@@ -11,14 +11,14 @@
           "id": "m1",
           "type": "simple",
           "pos": [
-            3,
-            2
+            2,
+            1
           ]
         }
       ],
       "exits": [
         {
-          "side": "RIGHT",
+          "side": "BOTTOM",
           "index": 2
         }
       ],
@@ -27,7 +27,7 @@
       "solution": [
         {
           "blockId": "m1",
-          "dir": "RIGHT"
+          "dir": "DOWN"
         }
       ]
     },
@@ -79,76 +79,34 @@
       "blocks": [
         {
           "id": "m1",
-          "type": "constrained",
+          "type": "simple",
           "pos": [
-            3,
-            1
-          ],
-          "direction": "LEFT"
+            2,
+            3
+          ]
         },
         {
           "id": "m2",
-          "type": "simple",
+          "type": "constrained",
           "pos": [
-            1,
-            1
-          ]
-        }
-      ],
-      "exits": [
-        {
-          "side": "LEFT",
-          "index": 1
-        }
-      ],
-      "parMoves": 2,
-      "pack": "tutorial",
-      "solution": [
-        {
-          "blockId": "m2",
-          "dir": "LEFT"
+            2,
+            2
+          ],
+          "direction": "UP"
         },
-        {
-          "blockId": "m1",
-          "dir": "LEFT"
-        }
-      ]
-    },
-    "4": {
-      "id": 4,
-      "cols": 5,
-      "rows": 5,
-      "blocks": [
         {
           "id": "o1",
           "type": "obstacle",
           "pos": [
             0,
-            2
-          ]
-        },
-        {
-          "id": "m1",
-          "type": "constrained",
-          "pos": [
-            1,
-            4
-          ],
-          "direction": "UP"
-        },
-        {
-          "id": "m2",
-          "type": "simple",
-          "pos": [
-            1,
-            2
+            0
           ]
         }
       ],
       "exits": [
         {
           "side": "TOP",
-          "index": 1
+          "index": 2
         }
       ],
       "parMoves": 2,
@@ -161,6 +119,68 @@
         {
           "blockId": "m1",
           "dir": "UP"
+        }
+      ]
+    },
+    "4": {
+      "id": 4,
+      "cols": 6,
+      "rows": 6,
+      "blocks": [
+        {
+          "id": "m1",
+          "type": "simple",
+          "pos": [
+            3,
+            2
+          ]
+        },
+        {
+          "id": "m2",
+          "type": "constrained",
+          "pos": [
+            4,
+            3
+          ],
+          "direction": "RIGHT"
+        },
+        {
+          "id": "o1",
+          "type": "obstacle",
+          "pos": [
+            3,
+            4
+          ]
+        },
+        {
+          "id": "o2",
+          "type": "obstacle",
+          "pos": [
+            4,
+            4
+          ]
+        }
+      ],
+      "exits": [
+        {
+          "side": "RIGHT",
+          "index": 3
+        }
+      ],
+      "parMoves": 3,
+      "pack": "tutorial",
+      "solution": [
+        {
+          "blockId": "m2",
+          "dir": "RIGHT"
+        },
+        {
+          "blockId": "m1",
+          "dir": "DOWN"
+        },
+        {
+          "blockId": "m1",
+          "dir": "RIGHT"
         }
       ]
     },
@@ -213,43 +233,51 @@
       "rows": 6,
       "blocks": [
         {
-          "id": "o1",
-          "type": "obstacle",
-          "pos": [
-            2,
-            0
-          ]
-        },
-        {
           "id": "m1",
-          "type": "constrained",
-          "pos": [
-            3,
-            4
-          ],
-          "direction": "DOWN"
-        },
-        {
-          "id": "m2",
           "type": "simple",
           "pos": [
             3,
-            3
+            5
           ]
+        },
+        {
+          "id": "m2",
+          "type": "constrained",
+          "pos": [
+            2,
+            3
+          ],
+          "direction": "LEFT"
         },
         {
           "id": "m3",
           "type": "dependent",
           "pos": [
-            4,
-            0
+            5,
+            3
           ],
           "dependsOn": "m1"
+        },
+        {
+          "id": "o1",
+          "type": "obstacle",
+          "pos": [
+            5,
+            0
+          ]
+        },
+        {
+          "id": "o2",
+          "type": "obstacle",
+          "pos": [
+            3,
+            2
+          ]
         }
       ],
       "exits": [
         {
-          "side": "BOTTOM",
+          "side": "LEFT",
           "index": 3
         }
       ],
@@ -258,19 +286,19 @@
       "solution": [
         {
           "blockId": "m1",
-          "dir": "DOWN"
+          "dir": "UP"
         },
         {
           "blockId": "m2",
-          "dir": "DOWN"
+          "dir": "LEFT"
         },
         {
-          "blockId": "m3",
+          "blockId": "m1",
           "dir": "LEFT"
         },
         {
           "blockId": "m3",
-          "dir": "DOWN"
+          "dir": "LEFT"
         }
       ]
     },
@@ -280,68 +308,72 @@
       "rows": 6,
       "blocks": [
         {
-          "id": "o1",
-          "type": "obstacle",
-          "pos": [
-            0,
-            1
-          ]
-        },
-        {
           "id": "m1",
-          "type": "constrained",
+          "type": "simple",
           "pos": [
-            5,
-            2
-          ],
-          "direction": "LEFT"
+            4,
+            4
+          ]
         },
         {
           "id": "m2",
-          "type": "simple",
+          "type": "constrained",
           "pos": [
             3,
-            2
-          ]
+            3
+          ],
+          "direction": "UP"
         },
         {
           "id": "m3",
           "type": "dependent",
           "pos": [
-            2,
-            4
+            3,
+            5
           ],
           "dependsOn": "m1"
+        },
+        {
+          "id": "o1",
+          "type": "obstacle",
+          "pos": [
+            2,
+            4
+          ]
+        },
+        {
+          "id": "o2",
+          "type": "obstacle",
+          "pos": [
+            0,
+            4
+          ]
         }
       ],
       "exits": [
         {
-          "side": "LEFT",
-          "index": 2
+          "side": "TOP",
+          "index": 3
         }
       ],
-      "parMoves": 5,
+      "parMoves": 4,
       "pack": "tutorial",
       "solution": [
         {
           "blockId": "m2",
-          "dir": "LEFT"
+          "dir": "UP"
         },
         {
           "blockId": "m1",
           "dir": "LEFT"
         },
         {
-          "blockId": "m3",
-          "dir": "LEFT"
-        },
-        {
-          "blockId": "m3",
+          "blockId": "m1",
           "dir": "UP"
         },
         {
           "blockId": "m3",
-          "dir": "LEFT"
+          "dir": "UP"
         }
       ]
     },

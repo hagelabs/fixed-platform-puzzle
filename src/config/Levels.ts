@@ -32,13 +32,13 @@ const L = (
 // parMoves = optimal solver solution length (used for 3-star thresholds).
 
 export const LEVELS: LevelData[] = [
-  L(1, 5, 5, [S('m1',3,2)], [E('RIGHT',2)], 1, 'tutorial'),
+  L(1, 5, 5, [S('m1',2,1)], [E('BOTTOM',2)], 1, 'tutorial'),
   L(2, 5, 5, [S('m1',1,3), S('m2',1,2)], [E('BOTTOM',1)], 2, 'tutorial'),
-  L(3, 5, 5, [C('m1',3,1,'LEFT'), S('m2',1,1)], [E('LEFT',1)], 2, 'tutorial'),
-  L(4, 5, 5, [O('o1',0,2), C('m1',1,4,'UP'), S('m2',1,2)], [E('TOP',1)], 2, 'tutorial'),
+  L(3, 5, 5, [S('m1',2,3), C('m2',2,2,'UP'), O('o1',0,0)], [E('TOP',2)], 2, 'tutorial'),
+  L(4, 6, 6, [S('m1',3,2), C('m2',4,3,'RIGHT'), O('o1',3,4), O('o2',4,4)], [E('RIGHT',3)], 3, 'tutorial'),
   L(5, 5, 5, [C('m1',3,2,'RIGHT'), D('m2',1,2,'m1')], [E('RIGHT',2)], 2, 'tutorial'),
-  L(6, 6, 6, [O('o1',2,0), C('m1',3,4,'DOWN'), S('m2',3,3), D('m3',4,0,'m1')], [E('BOTTOM',3)], 4, 'tutorial'),
-  L(7, 6, 6, [O('o1',0,1), C('m1',5,2,'LEFT'), S('m2',3,2), D('m3',2,4,'m1')], [E('LEFT',2)], 5, 'tutorial'),
+  L(6, 6, 6, [S('m1',3,5), C('m2',2,3,'LEFT'), D('m3',5,3,'m1'), O('o1',5,0), O('o2',3,2)], [E('LEFT',3)], 4, 'tutorial'),
+  L(7, 6, 6, [S('m1',4,4), C('m2',3,3,'UP'), D('m3',3,5,'m1'), O('o1',2,4), O('o2',0,4)], [E('TOP',3)], 4, 'tutorial'),
   L(8, 6, 6, [O('o1',2,5), C('m1',3,1,'UP'), S('m2',3,4), D('m3',0,2,'m1')], [E('TOP',3)], 6, 'tutorial'),
   L(9, 6, 6, [O('o1',5,4), C('m1',3,3,'RIGHT'), S('m2',0,4), D('m3',0,3,'m1')], [E('RIGHT',3)], 6, 'hook'),
   L(10, 6, 6, [O('o1',3,4), C('m1',2,5,'DOWN'), S('m2',0,4), D('m3',2,4,'m1')], [E('BOTTOM',2)], 4, 'hook'),
@@ -128,13 +128,13 @@ export const LEVELS: LevelData[] = [
 export type SolutionMove = { blockId: string; dir: Direction };
 
 export const SOLUTIONS: Record<number, SolutionMove[]> = {
-  1: [{blockId:'m1',dir:'RIGHT'}],
+  1: [{blockId:'m1',dir:'DOWN'}],
   2: [{blockId:'m1',dir:'DOWN'}, {blockId:'m2',dir:'DOWN'}],
-  3: [{blockId:'m2',dir:'LEFT'}, {blockId:'m1',dir:'LEFT'}],
-  4: [{blockId:'m2',dir:'UP'}, {blockId:'m1',dir:'UP'}],
+  3: [{blockId:'m2',dir:'UP'}, {blockId:'m1',dir:'UP'}],
+  4: [{blockId:'m2',dir:'RIGHT'}, {blockId:'m1',dir:'DOWN'}, {blockId:'m1',dir:'RIGHT'}],
   5: [{blockId:'m1',dir:'RIGHT'}, {blockId:'m2',dir:'RIGHT'}],
-  6: [{blockId:'m1',dir:'DOWN'}, {blockId:'m2',dir:'DOWN'}, {blockId:'m3',dir:'LEFT'}, {blockId:'m3',dir:'DOWN'}],
-  7: [{blockId:'m2',dir:'LEFT'}, {blockId:'m1',dir:'LEFT'}, {blockId:'m3',dir:'LEFT'}, {blockId:'m3',dir:'UP'}, {blockId:'m3',dir:'LEFT'}],
+  6: [{blockId:'m1',dir:'UP'}, {blockId:'m2',dir:'LEFT'}, {blockId:'m1',dir:'LEFT'}, {blockId:'m3',dir:'LEFT'}],
+  7: [{blockId:'m2',dir:'UP'}, {blockId:'m1',dir:'LEFT'}, {blockId:'m1',dir:'UP'}, {blockId:'m3',dir:'UP'}],
   8: [{blockId:'m1',dir:'UP'}, {blockId:'m2',dir:'UP'}, {blockId:'m3',dir:'RIGHT'}, {blockId:'m3',dir:'DOWN'}, {blockId:'m3',dir:'LEFT'}, {blockId:'m3',dir:'UP'}],
   9: [{blockId:'m1',dir:'RIGHT'}, {blockId:'m3',dir:'RIGHT'}, {blockId:'m2',dir:'UP'}, {blockId:'m2',dir:'RIGHT'}, {blockId:'m2',dir:'DOWN'}, {blockId:'m2',dir:'RIGHT'}],
   10: [{blockId:'m1',dir:'DOWN'}, {blockId:'m3',dir:'DOWN'}, {blockId:'m2',dir:'RIGHT'}, {blockId:'m2',dir:'DOWN'}],

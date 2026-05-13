@@ -8,9 +8,10 @@
 //   npx tsx scripts/bake-constructive.ts test L24     # dryrun for specific level
 //   npx tsx scripts/bake-constructive.ts bake         # run full bake (NOT IMPLEMENTED YET)
 
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LEVELS as EXISTING_LEVELS, SOLUTIONS as EXISTING_SOLUTIONS } from '../src/config/Levels';
 
 // ============================================================
 // Shared types
@@ -244,78 +245,168 @@ function pick<T>(rand: () => number, arr: T[]): T {
 
 export interface ScrambleConfig {
   steps: number;                 // target par (number of reverse moves)
-  avoidSameBlockStreak?: number; // discourage consecutive reverses of same block (default 2)
-  avoidInverseLast?: boolean;    // reject reverse that exactly undoes previous reverse (default true)
+  maxNodes?: number;             // DFS budget (default steps * 200)
+  topK?: number;                 // explore top-K biased options per node (default 4)
+  verifyPerStep?: boolean;       // forward-verify after each reverse; backtrack if par mismatch (default true)
+  verifyBudget?: number;         // forward solver budget per step (default 20000 nodes)
+  verifyTolerance?: number;      // accept par_new >= history.length - tolerance (default 1)
 }
 
+function cloneState(s: ScrambleState): ScrambleState {
+  return {
+    cols: s.cols, rows: s.rows, movables: s.movables,
+    positions: s.positions.slice(),
+    obstacleSet: s.obstacleSet, iceSet: s.iceSet,
+    exits: s.exits, exitCount: s.exitCount,
+  };
+}
+
+// Distance-from-nearest-exit heuristic. Higher = block lands further from exit (more puzzle depth).
+function scoreOption(state: ScrambleState, opt: ReverseOption): number {
+  let minDist = Infinity;
+  for (const e of state.exits) {
+    const tc = e.side === 'LEFT' ? 0 : e.side === 'RIGHT' ? state.cols - 1 : e.index;
+    const tr = e.side === 'TOP' ? 0 : e.side === 'BOTTOM' ? state.rows - 1 : e.index;
+    const d = Math.abs(opt.srcCol - tc) + Math.abs(opt.srcRow - tr);
+    if (d < minDist) minDist = d;
+  }
+  return minDist;
+}
+
+// Filter + order reverse options per heuristics. Returns ordered array (best first).
+function shapeOptions(
+  all: ReverseOption[],
+  state: ScrambleState,
+  idMap: Map<string, number>,
+  history: ReverseOption[],
+): ReverseOption[] {
+  const anyExited = state.positions.some((p) => p === null);
+  let pool: ReverseOption[];
+  if (anyExited) {
+    const unExits = all.filter((o) => o.fromExit);
+    // children-first dep ordering: prefer dependents whose parent still exited,
+    // AND prefer DEEPEST child (longest dep chain) first.
+    // Compute dep-depth for each block (chain length from this block to root).
+    const depth = new Map<number, number>();
+    function getDepth(idx: number): number {
+      if (depth.has(idx)) return depth.get(idx)!;
+      const b = state.movables[idx];
+      if (b.type !== 'dependent' || !b.dependsOn) { depth.set(idx, 0); return 0; }
+      const parentIdx = idMap.get(b.dependsOn);
+      if (parentIdx === undefined) { depth.set(idx, 0); return 0; }
+      const d = 1 + getDepth(parentIdx);
+      depth.set(idx, d);
+      return d;
+    }
+    const childrenFirst = unExits
+      .filter((o) => {
+        const b = state.movables[o.blockIdx];
+        if (b.type !== 'dependent' || !b.dependsOn) return false;
+        const parentIdx = idMap.get(b.dependsOn);
+        return parentIdx !== undefined && state.positions[parentIdx] === null;
+      })
+      .sort((a, b) => getDepth(b.blockIdx) - getDepth(a.blockIdx));
+    pool = childrenFirst.length > 0 ? childrenFirst : unExits;
+  } else {
+    pool = all.filter((o) => !o.fromExit);
+  }
+  if (pool.length === 0) pool = all;
+
+  // Anti-streak + anti-inverse
+  const last = history[history.length - 1];
+  const last2 = history.slice(-2);
+  const last2Ids = new Set(last2.map((o) => o.blockIdx));
+  pool = pool.filter((o) => {
+    if (last2.length === 2 && last2Ids.size === 1 && last2Ids.has(o.blockIdx)) return false;
+    if (last && !last.fromExit && !o.fromExit && o.blockIdx === last.blockIdx
+      && o.dir === OPPOSITE[last.dir]) return false;
+    return true;
+  });
+  if (pool.length === 0) pool = all;
+
+  // Bias: sort by distance-from-exit DESC (further is better for puzzle depth).
+  pool.sort((a, b) => scoreOption(state, b) - scoreOption(state, a));
+  return pool;
+}
+
+interface DFSNode {
+  state: ScrambleState;
+  history: ReverseOption[];
+  untried: ReverseOption[]; // ordered best-first
+}
+
+// DFS with backtracking. Explores top-K options per node biased by distance.
+// Falls back to deeper alternatives if dead-ends are hit.
 export function scramble(
   initial: ScrambleState,
   idMap: Map<string, number>,
   cfg: ScrambleConfig,
   rand: () => number,
 ): { state: ScrambleState; steps: number; reverses: ReverseOption[] } | null {
-  // Clone state for safety
-  const state: ScrambleState = {
-    cols: initial.cols,
-    rows: initial.rows,
-    movables: initial.movables,
-    positions: initial.positions.slice(),
-    obstacleSet: initial.obstacleSet,
-    iceSet: initial.iceSet,
-    exits: initial.exits,
-    exitCount: initial.exitCount,
-  };
-  const history: ReverseOption[] = [];
-  const sameBlockStreak = cfg.avoidSameBlockStreak ?? 2;
-  const avoidInverse = cfg.avoidInverseLast ?? true;
+  const target = cfg.steps;
+  const maxNodes = cfg.maxNodes ?? target * 200;
+  const topK = cfg.topK ?? 4;
+  const verifyPerStep = cfg.verifyPerStep ?? true;
+  const verifyBudget = cfg.verifyBudget ?? 20000;
+  const verifyTolerance = cfg.verifyTolerance ?? 1;
 
-  for (let step = 0; step < cfg.steps; step++) {
-    const all = enumerateReverseOptions(state, idMap);
-    if (all.length === 0) return null;
-
-    // Phase priority: while any block still exited, prefer un-exit options.
-    // (Forward order: parents exit first, children later. Reverse order: children un-exit
-    // first while parent still in exited-state.) Once all blocks placed in-grid, switch to
-    // in-grid reverses to add path depth.
-    const anyStillExited = state.positions.some((p) => p === null);
-    let phasePool: ReverseOption[];
-    if (anyStillExited) {
-      // Un-exit phase: must place blocks in-grid in REVERSE dep order
-      // (children first, parents last). Bias: prefer un-exit options where the block is a
-      // dependent whose parent is still exited (cannot un-exit later if we un-exit parent first).
-      const unExits = all.filter((o) => o.fromExit);
-      const childrenFirst = unExits.filter((o) => {
-        const b = state.movables[o.blockIdx];
-        if (b.type !== 'dependent' || !b.dependsOn) return false;
-        const parentIdx = idMap.get(b.dependsOn);
-        return parentIdx !== undefined && state.positions[parentIdx] === null;
-      });
-      phasePool = childrenFirst.length > 0 ? childrenFirst : unExits;
-    } else {
-      phasePool = all.filter((o) => !o.fromExit);
-    }
-    const basePool = phasePool.length > 0 ? phasePool : all;
-
-    // Filter heuristics
-    const last = history[history.length - 1];
-    const recent = history.slice(-sameBlockStreak);
-    const sameStreakIds = new Set(recent.map((o) => o.blockIdx));
-    const filtered = basePool.filter((o) => {
-      if (recent.length === sameBlockStreak && sameStreakIds.size === 1 && sameStreakIds.has(o.blockIdx)) {
-        return false;
-      }
-      if (avoidInverse && last && !last.fromExit && !o.fromExit && o.blockIdx === last.blockIdx
-        && o.dir === OPPOSITE[last.dir]) {
-        return false;
-      }
-      return true;
-    });
-    const pool = filtered.length > 0 ? filtered : basePool;
-    const chosen = pick(rand, pool);
-    applyReverseMove(state, chosen);
-    history.push(chosen);
+  // Initial node
+  const initState = cloneState(initial);
+  const initAll = enumerateReverseOptions(initState, idMap);
+  if (initAll.length === 0) return null;
+  const initOpts = shapeOptions(initAll, initState, idMap, []).slice(0, topK);
+  // Slight randomization within topK to vary across seeds
+  if (rand() < 0.5 && initOpts.length > 1) {
+    const i = Math.floor(rand() * initOpts.length);
+    const j = Math.floor(rand() * initOpts.length);
+    [initOpts[i], initOpts[j]] = [initOpts[j], initOpts[i]];
   }
-  return { state, steps: history.length, reverses: history };
+
+  const stack: DFSNode[] = [{ state: initState, history: [], untried: initOpts }];
+  let nodesExplored = 0;
+
+  while (stack.length > 0 && nodesExplored < maxNodes) {
+    nodesExplored++;
+    const top = stack[stack.length - 1];
+
+    if (top.history.length === target) {
+      return { state: top.state, steps: top.history.length, reverses: top.history };
+    }
+    if (top.untried.length === 0) {
+      stack.pop();
+      continue;
+    }
+
+    const opt = top.untried.shift()!;
+    const newState = cloneState(top.state);
+    applyReverseMove(newState, opt);
+    const newHistory = [...top.history, opt];
+
+    // Per-step forward verify: after this reverse, forward par should be at least
+    // history.length - tolerance. Skip if reverse created big shortcut.
+    // Tolerance scales with depth — early-stage strictness, late-stage slack.
+    if (verifyPerStep) {
+      const fv = forwardSolve(newState, idMap, verifyBudget, target + 5);
+      if (!fv.solvable) continue;
+      const scaledTol = verifyTolerance + Math.floor(newHistory.length / 5);
+      if (fv.optimal < newHistory.length - scaledTol) continue;
+    }
+
+    const allNext = enumerateReverseOptions(newState, idMap);
+    let untried: ReverseOption[];
+    if (allNext.length === 0 && newHistory.length < target) {
+      // dead-end; skip pushing this node so we backtrack from current top
+      continue;
+    }
+    untried = shapeOptions(allNext, newState, idMap, newHistory).slice(0, topK);
+    if (rand() < 0.5 && untried.length > 1) {
+      const i = Math.floor(rand() * untried.length);
+      const j = Math.floor(rand() * untried.length);
+      [untried[i], untried[j]] = [untried[j], untried[i]];
+    }
+    stack.push({ state: newState, history: newHistory, untried });
+  }
+  return null;
 }
 
 // ============================================================
@@ -548,6 +639,151 @@ export function initialState(spec: PhaseSpec): { state: ScrambleState; idMap: Ma
 }
 
 // ============================================================
+// bakeOne — produce a single level matching target par via multi-seed retry.
+// ============================================================
+export interface BakeOneResult {
+  spec: PhaseSpec;
+  positions: Array<[number, number] | null>; // final scrambled positions of movables
+  par: number;          // actual forward par (== targetPar on success)
+  solution: { blockId: string; dir: Direction }[]; // optimal forward path
+  reverses: ReverseOption[]; // scramble history (debug)
+  seedUsed: number;
+  attempts: number;
+}
+
+export interface BakeOneConfig {
+  seedsBudget?: number;   // max seeds to try (default 200)
+  tolerance?: number;     // accept par within [target-tol, target+tol] (default 0 = exact)
+  solverBudget?: number;  // forward solver maxStates (default 100000)
+  solverMaxDepth?: number;// (default targetPar + 20)
+  scrambleNodes?: number; // DFS budget per scramble (default targetPar * 200)
+  topK?: number;          // (default 6)
+  verbose?: boolean;
+  verifyPerStepInScramble?: boolean; // pass to scramble cfg (default true)
+}
+
+export function bakeOne(spec: PhaseSpec, cfg: BakeOneConfig = {}): BakeOneResult | null {
+  const seedsBudget = cfg.seedsBudget ?? 200;
+  const tolerance = cfg.tolerance ?? 0;
+  const solverBudget = cfg.solverBudget ?? 100000;
+  const solverMaxDepth = cfg.solverMaxDepth ?? (spec.targetPar + 20);
+  const scrambleNodes = cfg.scrambleNodes ?? spec.targetPar * 500;
+  const topK = cfg.topK ?? 10;
+
+  let bestNear: BakeOneResult | null = null;
+  let bestDiff = Infinity;
+  let scrambleFails = 0;
+  let solverFails = 0;
+  let succeeded = 0;
+
+  for (let seed = 0; seed < seedsBudget; seed++) {
+    const rand = rng(spec.id * 9301 + seed * 49297 + 1);
+    const { state, idMap } = initialState(spec);
+    const result = scramble(state, idMap, {
+      steps: spec.targetPar,
+      maxNodes: scrambleNodes,
+      topK,
+      verifyPerStep: cfg.verifyPerStepInScramble ?? true,
+    }, rand);
+    if (!result) { scrambleFails++; continue; }
+
+    const verify = forwardSolve(result.state, idMap, solverBudget, solverMaxDepth);
+    if (!verify.solvable) { solverFails++; continue; }
+    succeeded++;
+
+    const diff = Math.abs(spec.targetPar - verify.optimal);
+    if (diff <= tolerance) {
+      // success
+      return {
+        spec,
+        positions: result.state.positions.slice(),
+        par: verify.optimal,
+        solution: extractSolutionPath(result.state, idMap, solverBudget, solverMaxDepth),
+        reverses: result.reverses,
+        seedUsed: seed,
+        attempts: seed + 1,
+      };
+    }
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestNear = {
+        spec,
+        positions: result.state.positions.slice(),
+        par: verify.optimal,
+        solution: extractSolutionPath(result.state, idMap, solverBudget, solverMaxDepth),
+        reverses: result.reverses,
+        seedUsed: seed,
+        attempts: seed + 1,
+      };
+    }
+    if (cfg.verbose && seed % 50 === 49) {
+      console.log(`  ...phase ${spec.id} seed ${seed}: bestDiff=${bestDiff}`);
+    }
+  }
+  if (cfg.verbose) {
+    console.log(`  stats: scrambleFails=${scrambleFails} solverFails=${solverFails} succeeded=${succeeded}`);
+  }
+  return bestNear;
+}
+
+// Extract solution path with parent tracking (A* variant of forwardSolve).
+function extractSolutionPath(
+  state: ScrambleState, idMap: Map<string, number>, maxStates: number, maxDepth: number,
+): { blockId: string; dir: Direction }[] {
+  const ctx = buildSolverCtx(state, idMap);
+  if (ctx.movables.length === 0) return [];
+  const init: Pos[] = state.positions.slice();
+  const initE = state.exitCount;
+  const initKey = stateKey(init, initE);
+  const open = new MinHeap<{ p: Pos[]; e: number; g: number; key: string }>();
+  open.push({ p: init, e: initE, g: 0, key: initKey }, heuristic(ctx, init));
+  const seen = new Map<string, number>();
+  seen.set(initKey, 0);
+  const parents = new Map<string, { parent: string | null; move: { blockId: string; dir: Direction } | null }>();
+  parents.set(initKey, { parent: null, move: null });
+  let visited = 0;
+  while (open.size > 0) {
+    if (visited > maxStates) return [];
+    const cur = open.pop()!;
+    visited++;
+    let allOut = true;
+    for (const p of cur.p) if (p) { allOut = false; break; }
+    if (allOut) {
+      const path: { blockId: string; dir: Direction }[] = [];
+      let k: string | null = cur.key;
+      while (k) {
+        const rec = parents.get(k);
+        if (!rec || !rec.move) break;
+        path.push(rec.move);
+        k = rec.parent;
+      }
+      path.reverse();
+      return path;
+    }
+    if (cur.g >= maxDepth) continue;
+    for (let i = 0; i < cur.p.length; i++) {
+      if (!cur.p[i]) continue;
+      for (const d of DIRS) {
+        const r = forwardAttempt(ctx, cur.p, cur.e, i, d);
+        if (!r) continue;
+        const next: Pos[] = cur.p.slice();
+        let nextE = cur.e;
+        if (r.kind === 'exit') { next[i] = null; nextE++; }
+        else { next[i] = [r.nextC!, r.nextR!]; }
+        const nk = stateKey(next, nextE);
+        const ng = cur.g + 1;
+        const prev = seen.get(nk);
+        if (prev !== undefined && prev <= ng) continue;
+        seen.set(nk, ng);
+        parents.set(nk, { parent: cur.key, move: { blockId: ctx.movables[i].id, dir: d } });
+        open.push({ p: next, e: nextE, g: ng, key: nk }, ng + heuristic(ctx, next));
+      }
+    }
+  }
+  return [];
+}
+
+// ============================================================
 // Dryrun: scramble a sample phase, print result, verify forward.
 // ============================================================
 interface SampleCase {
@@ -555,96 +791,483 @@ interface SampleCase {
   phase: PhaseSpec;
 }
 
+// ============================================================
+// Phase generator — produce PhaseSpec per target par with obstacles arranged
+// to allow scramble to reach par target. Obstacles placed in zig-zag pattern
+// to force detours during reverse-scramble.
+// ============================================================
+function generatePhase(id: number, targetPar: number, pack: string, rand: () => number): PhaseSpec {
+  // Grid sized to target par
+  let cols: number;
+  if (targetPar <= 3) cols = 5;
+  else if (targetPar <= 6) cols = 6;
+  else if (targetPar <= 10) cols = 7;
+  else if (targetPar <= 14) cols = 8;
+  else if (targetPar <= 18) cols = 9;
+  else cols = 10;
+  const rows = cols;
+
+  // Block roster scales with par
+  const blocks: BlockSpec[] = [];
+  let movableCount: number;
+  let depCount: number;
+  let yellowCount: number;
+  let obstacleCount: number;
+  if (pack === 'tutorial') {
+    movableCount = targetPar <= 2 ? 1 : targetPar <= 4 ? 2 : 3;
+    depCount = targetPar >= 5 ? 1 : 0;
+    yellowCount = targetPar >= 3 ? 1 : 0;
+    obstacleCount = targetPar <= 2 ? 0 : Math.max(1, Math.floor(targetPar / 2));
+  } else if (pack === 'hook') {
+    movableCount = targetPar <= 8 ? 3 : 4;
+    depCount = 1;
+    yellowCount = 1;
+    obstacleCount = Math.max(2, Math.floor(targetPar / 2));
+  } else if (pack === 'gears') {
+    movableCount = targetPar <= 12 ? 4 : 5;
+    depCount = targetPar <= 13 ? 2 : 3;
+    yellowCount = 1;
+    obstacleCount = Math.max(3, Math.floor(targetPar / 2));
+  } else if (pack === 'stones') {
+    movableCount = targetPar <= 17 ? 4 : 5;
+    depCount = targetPar <= 16 ? 2 : 2;
+    yellowCount = 1;
+    obstacleCount = Math.max(4, Math.floor(targetPar / 2));
+  } else {
+    movableCount = 5;
+    depCount = 3;
+    yellowCount = 1;
+    obstacleCount = Math.max(5, Math.floor(targetPar / 2));
+  }
+
+  // Build block specs (positions [0,0], will be set by scramble)
+  for (let i = 0; i < movableCount - depCount - yellowCount; i++) {
+    blocks.push({ id: `m${i + 1}`, type: 'simple', pos: [0, 0] });
+  }
+  if (yellowCount > 0) {
+    // Constrained block direction must MATCH an exit side so it can exit during forward play.
+    // Use exit side dir directly.
+    const exitSidesArr: ExitSide[] = ['RIGHT', 'BOTTOM', 'LEFT', 'TOP'];
+    const exitSideForBlock = exitSidesArr[id % 4];
+    const dir: Direction = exitSideForBlock === 'TOP' ? 'UP'
+      : exitSideForBlock === 'BOTTOM' ? 'DOWN'
+      : exitSideForBlock === 'LEFT' ? 'LEFT'
+      : 'RIGHT';
+    for (let i = 0; i < yellowCount; i++) {
+      const idIdx = movableCount - depCount - yellowCount + i + 1;
+      blocks.push({ id: `m${idIdx}`, type: 'constrained', pos: [0, 0], direction: dir });
+    }
+  }
+  for (let i = 0; i < depCount; i++) {
+    const idIdx = movableCount - depCount + i + 1;
+    const parentId = i === 0 ? 'm1' : `m${idIdx - 1}`; // linear chain depth
+    blocks.push({ id: `m${idIdx}`, type: 'dependent', pos: [0, 0], dependsOn: parentId });
+  }
+
+  // Exits: single exit on side, index near center
+  const sides: ExitSide[] = ['RIGHT', 'BOTTOM', 'LEFT', 'TOP'];
+  const exitSide = sides[id % 4];
+  const isHoriz = exitSide === 'LEFT' || exitSide === 'RIGHT';
+  const exitIdx = Math.floor((isHoriz ? rows : cols) / 2);
+  const exits: ExitZone[] = [{ side: exitSide, index: exitIdx }];
+
+  // Obstacles: place in zig-zag, avoid exit cell
+  const obstacles: [number, number][] = [];
+  const obstacleSet = new Set<number>();
+  const exitCellKey = (() => {
+    const [c, r] = exitCell({ side: exitSide, index: exitIdx }, cols, rows);
+    return r * cols + c;
+  })();
+  let placed = 0;
+  let attempts = 0;
+  while (placed < obstacleCount && attempts < 200) {
+    attempts++;
+    const c = Math.floor(rand() * cols);
+    const r = Math.floor(rand() * rows);
+    const k = r * cols + c;
+    if (k === exitCellKey) continue;
+    if (obstacleSet.has(k)) continue;
+    obstacleSet.add(k);
+    obstacles.push([c, r]);
+    blocks.push({ id: `o${placed + 1}`, type: 'obstacle', pos: [c, r] });
+    placed++;
+  }
+
+  return { id, cols, rows, exits, blocks, obstacles, targetPar, pack };
+}
+
 const SAMPLES: SampleCase[] = [
-  {
-    label: 'tutorial-2: simple par 4',
-    phase: {
-      id: 1,
-      cols: 8, rows: 8,
-      exits: [{ side: 'RIGHT', index: 4 }],
-      blocks: [
-        { id: 'm1', type: 'simple', pos: [0, 0] },
-        { id: 'm2', type: 'simple', pos: [0, 0] },
-      ],
-      targetPar: 4,
-      pack: 'demo',
-    },
-  },
-  {
-    label: 'hook-7: 3 movables, 1 dep, par 8',
-    phase: {
-      id: 2,
-      cols: 9, rows: 9,
-      exits: [{ side: 'RIGHT', index: 4 }],
-      blocks: [
-        { id: 'm1', type: 'simple', pos: [0, 0] },
-        { id: 'm2', type: 'simple', pos: [0, 0] },
-        { id: 'm3', type: 'dependent', pos: [0, 0], dependsOn: 'm1' },
-        { id: 'o1', type: 'obstacle', pos: [3, 4] },
-      ],
-      obstacles: [[3, 4]],
-      targetPar: 8,
-      pack: 'demo',
-    },
-  },
-  {
-    label: 'master-22: chain dep depth 3, par 16',
-    phase: {
-      id: 3,
-      cols: 10, rows: 10,
-      exits: [{ side: 'RIGHT', index: 5 }],
-      blocks: [
-        { id: 'm1', type: 'simple', pos: [0, 0] },
-        { id: 'm2', type: 'dependent', pos: [0, 0], dependsOn: 'm1' },
-        { id: 'm3', type: 'dependent', pos: [0, 0], dependsOn: 'm2' },
-        { id: 'm4', type: 'dependent', pos: [0, 0], dependsOn: 'm3' },
-        { id: 'o1', type: 'obstacle', pos: [4, 5] },
-        { id: 'o2', type: 'obstacle', pos: [7, 5] },
-        { id: 'o3', type: 'obstacle', pos: [2, 5] },
-      ],
-      obstacles: [[4, 5], [7, 5], [2, 5]],
-      targetPar: 16,
-      pack: 'demo',
-    },
-  },
+  { label: 'tutorial-1 (par=2)', phase: generatePhase(1, 2, 'tutorial', rng(101)) },
+  { label: 'tutorial-5 (par=4)', phase: generatePhase(5, 4, 'tutorial', rng(105)) },
+  { label: 'hook-9 (par=7)', phase: generatePhase(9, 7, 'hook', rng(109)) },
+  { label: 'gears-24 (par=10)', phase: generatePhase(24, 10, 'gears', rng(124)) },
+  { label: 'stones-48 (par=17)', phase: generatePhase(48, 17, 'stones', rng(148)) },
+  { label: 'master-78 (par=28)', phase: generatePhase(78, 28, 'master', rng(178)) },
 ];
 
 function dryrunSample(idx?: number): void {
   const cases = idx !== undefined && idx >= 0 && idx < SAMPLES.length ? [SAMPLES[idx]] : SAMPLES;
   for (const { label, phase } of cases) {
     console.log(`\n=== ${label} ===`);
-    const { state, idMap } = initialState(phase);
-    console.log(`grid: ${phase.cols}x${phase.rows}, target par=${phase.targetPar}, movables=${state.movables.length}, obstacles=${state.obstacleSet.size}`);
+    console.log(`grid: ${phase.cols}x${phase.rows}, target par=${phase.targetPar}, movables=${phase.blocks.filter(b => b.type !== 'obstacle').length}, obstacles=${(phase.obstacles ?? []).length}`);
 
-    // Try multiple seeds; report best result
-    const SEEDS = 20;
-    let bestDiff = Infinity;
-    let bestReport: string | null = null;
-    let successes = 0;
-    let par_eq = 0, par_lt = 0;
-    for (let s = 0; s < SEEDS; s++) {
-      const rand = rng(phase.id * 131 + s * 17 + 1);
-      const result = scramble(state, idMap, { steps: phase.targetPar }, rand);
-      if (!result) continue;
-      const verify = forwardSolve(result.state, idMap, 80000, 80);
-      if (!verify.solvable) continue;
-      successes++;
-      const diff = phase.targetPar - verify.optimal;
-      if (diff === 0) par_eq++;
-      else if (diff > 0) par_lt++;
-      if (Math.abs(diff) < Math.abs(bestDiff)) {
-        bestDiff = diff;
-        const placements = result.state.movables.map((b, i) => {
-          const p = result.state.positions[i];
-          return `${b.id}=${p ? `(${p[0]},${p[1]})` : 'exited'}`;
-        }).join(' ');
-        bestReport = `optimal=${verify.optimal} (target ${phase.targetPar}, diff=${diff}) — ${placements}`;
+    const t0 = Date.now();
+    const result = bakeOne(phase, { seedsBudget: 200, tolerance: 2, verbose: true, verifyPerStepInScramble: false } as BakeOneConfig & { verifyPerStepInScramble: boolean });
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    if (!result) {
+      console.log(`fail: no scramble produced solvable layout (${dt}s)`);
+      continue;
+    }
+    const placements = phase.blocks.filter(b => b.type !== 'obstacle').map((b, i) => {
+      const p = result.positions[i];
+      return `${b.id}=${p ? `(${p[0]},${p[1]})` : 'exited'}`;
+    }).join(' ');
+    const hit = result.par === phase.targetPar;
+    console.log(`${hit ? '✓ HIT' : '~ near'}: par=${result.par}/${phase.targetPar} (diff=${phase.targetPar - result.par}, seed=${result.seedUsed}, attempts=${result.attempts}, ${dt}s)`);
+    console.log(`  placements: ${placements}`);
+    console.log(`  solution length: ${result.solution.length}`);
+  }
+}
+
+// ============================================================
+// CLI + JSON store integration (mirrors bake-v2)
+// ============================================================
+
+// Brief par targets per level. Keep in sync with scripts/bake-v2.ts PAR_TARGETS.
+const PAR_TARGETS: number[] = [
+  // Tutorial L1-8
+  2, 3, 3, 4, 4, 5, 5, 6,
+  // Hook L9-23
+  7, 6, 8, 9, 7, 10, 8, 9, 11, 8, 10, 12, 9, 10, 12,
+  // Gears L24-43
+  10, 11, 12, 10, 13, 14, 11, 14, 12, 13, 15, 12, 14, 16, 13, 15, 17, 14, 16, 18,
+  // Stones L44-63
+  14, 15, 16, 14, 17, 16, 18, 15, 17, 19, 16, 18, 20, 17, 19, 20, 18, 21, 19, 22,
+  // Master L64-72
+  18, 19, 20, 18, 21, 20, 22, 19, 23,
+];
+const TOTAL_BAKED = 72;
+const PACK_RANGES: Record<string, [number, number]> = {
+  tutorial: [1, 8],
+  hook: [9, 23],
+  gears: [24, 43],
+  stones: [44, 63],
+  master: [64, 72],
+};
+function packOfId(id: number): string {
+  if (id <= 8) return 'tutorial';
+  if (id <= 23) return 'hook';
+  if (id <= 43) return 'gears';
+  if (id <= 63) return 'stones';
+  if (id <= 78) return 'master';
+  return 'fixture';
+}
+
+// Stored level format (compatible with bake-v2 store)
+interface StoredLevel {
+  id: number;
+  cols: number;
+  rows: number;
+  blocks: BlockSpec[];
+  exits: { side: ExitSide; index: number }[];
+  parMoves: number;
+  pack: string;
+  solution: { blockId: string; dir: Direction }[];
+}
+
+const STORE_PATH_REL = 'scripts/output/baked.json';
+
+function loadStore(repoRoot: string): Map<number, StoredLevel> {
+  const store = new Map<number, StoredLevel>();
+  const full = resolve(repoRoot, STORE_PATH_REL);
+  if (!existsSync(full)) return store;
+  try {
+    const raw = JSON.parse(readFileSync(full, 'utf8'));
+    if (raw && raw.levels && typeof raw.levels === 'object') {
+      for (const [k, v] of Object.entries(raw.levels)) {
+        store.set(parseInt(k, 10), v as StoredLevel);
       }
     }
-    console.log(`seeds: ${SEEDS}, solvable: ${successes}, par-hit: ${par_eq}, par-drift: ${par_lt}`);
-    if (bestReport) console.log(`best: ${bestReport}`);
-    else console.log('no valid scramble across all seeds');
+  } catch (e) {
+    console.warn(`[store] failed to read ${STORE_PATH_REL}:`, (e as Error).message);
   }
+  return store;
+}
+
+function saveStore(repoRoot: string, store: Map<number, StoredLevel>): void {
+  const full = resolve(repoRoot, STORE_PATH_REL);
+  mkdirSync(dirname(full), { recursive: true });
+  const sortedIds = [...store.keys()].sort((a, b) => a - b);
+  const obj: { version: number; updated: string; levels: Record<string, StoredLevel> } = {
+    version: 1, updated: new Date().toISOString(), levels: {},
+  };
+  for (const id of sortedIds) obj.levels[String(id)] = store.get(id)!;
+  writeFileSync(full, JSON.stringify(obj, null, 2) + '\n', 'utf8');
+}
+
+function parseBakeArgs(): { ids: number[]; description: string } {
+  const args = process.argv.slice(3); // skip [node, script, "bake"]
+  const ids = new Set<number>();
+  const labels: string[] = [];
+  for (const arg of args) {
+    if (arg.startsWith('--pack=')) {
+      const p = arg.slice(7);
+      const range = PACK_RANGES[p];
+      if (!range) { console.error(`unknown pack '${p}'`); process.exit(1); }
+      for (let i = range[0]; i <= range[1]; i++) ids.add(i);
+      labels.push(`pack=${p}`);
+    } else if (arg.startsWith('--ids=')) {
+      const expr = arg.slice(6);
+      for (const part of expr.split(',')) {
+        const m = part.match(/^(\d+)(?:-(\d+))?$/);
+        if (!m) { console.error(`bad ids '${part}'`); process.exit(1); }
+        const lo = parseInt(m[1], 10);
+        const hi = m[2] ? parseInt(m[2], 10) : lo;
+        for (let i = lo; i <= hi; i++) ids.add(i);
+      }
+      labels.push(`ids=${expr}`);
+    }
+  }
+  for (const id of ids) {
+    if (id < 1 || id > TOTAL_BAKED) {
+      console.error(`id ${id} out of bake range (1..${TOTAL_BAKED})`);
+      process.exit(1);
+    }
+  }
+  if (ids.size === 0) {
+    for (let i = 1; i <= TOTAL_BAKED; i++) ids.add(i);
+    labels.push(`all(1..${TOTAL_BAKED})`);
+  }
+  return { ids: [...ids].sort((a, b) => a - b), description: labels.join(' + ') };
+}
+
+// Emit Levels.ts from full store (mirror of bake-v2 emit). Inline fixtures L73-80.
+function emitLevelsTs(entries: StoredLevel[]): string {
+  const header = `import { LevelData, BlockData, Color, ExitZone, Direction } from '../types/Game';
+
+const S = (id: string, c: number, r: number): BlockData => ({
+  id, color: 'red', position: [c, r], size: [1, 1], type: 'simple',
+});
+const O = (id: string, c: number, r: number): BlockData => ({
+  id, color: 'red', position: [c, r], size: [1, 1], type: 'obstacle',
+});
+const C = (id: string, c: number, r: number, dir: Direction): BlockData => ({
+  id, color: 'yellow', position: [c, r], size: [1, 1], type: 'constrained', direction: dir,
+});
+const D = (id: string, c: number, r: number, dep: string): BlockData => ({
+  id, color: 'blue', position: [c, r], size: [1, 1], type: 'dependent', dependsOn: dep,
+});
+const SC = (id: string, c: number, r: number, color: Color): BlockData => ({
+  id, color, position: [c, r], size: [1, 1], type: 'simple',
+});
+const K = (id: string, c: number, r: number, unlockAt: number, color: Color = 'purple'): BlockData => ({
+  id, color, position: [c, r], size: [1, 1], type: 'lock', unlockAt,
+});
+const E = (
+  side: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT',
+  index: number,
+): ExitZone => ({ side, index });
+const L = (
+  id: number, cols: number, rows: number, blocks: BlockData[], exits: ExitZone[],
+  parMoves: number, pack?: string, iceCells?: [number, number][],
+): LevelData => ({ id, cols, rows, blocks, exits, parMoves, pack, iceCells });
+
+// AUTO-BAKED via scripts/bake-constructive.ts (Opsi 2 reverse-scramble).
+// parMoves = optimal solver solution length (used for 3-star thresholds).
+
+export const LEVELS: LevelData[] = [
+`;
+
+  const body = entries.map((e) => {
+    const blocksStr = e.blocks.map((b) => {
+      if (b.type === 'simple') return `S('${b.id}',${b.pos[0]},${b.pos[1]})`;
+      if (b.type === 'obstacle') return `O('${b.id}',${b.pos[0]},${b.pos[1]})`;
+      if (b.type === 'constrained') return `C('${b.id}',${b.pos[0]},${b.pos[1]},'${b.direction}')`;
+      return `D('${b.id}',${b.pos[0]},${b.pos[1]},'${b.dependsOn}')`;
+    }).join(', ');
+    const exitsStr = e.exits.map((x) => `E('${x.side}',${x.index})`).join(', ');
+    return `  L(${e.id}, ${e.cols}, ${e.rows}, [${blocksStr}], [${exitsStr}], ${e.parMoves}, '${e.pack}'),`;
+  }).join('\n');
+
+  // Fixtures L73-80 inline (hand-authored, not regen-able via bake-constructive)
+  const fixtures = `
+  // === MASTER PACK FIXTURES (L73-78): ice push + lock counter intros ===
+  L(73, 5, 3, [SC('m1',0,1,'red'), O('o1',2,1)], [E('RIGHT',1)], 2, 'master', [[1,1]]),
+  L(74, 7, 3, [SC('m1',0,1,'red'), O('o1',2,1), O('o2',4,1)], [E('RIGHT',1)], 2, 'master', [[1,1],[3,1]]),
+  L(75, 6, 4, [SC('m1',0,1,'red'), SC('m2',0,2,'blue'), O('o1',3,1), O('o2',3,2)], [E('RIGHT',1), E('RIGHT',2)], 4, 'master', [[2,1],[2,2]]),
+  L(76, 6, 2, [SC('m1',0,0,'red'), K('k1',0,1,1)], [E('RIGHT',0), E('RIGHT',1)], 2, 'master'),
+  L(77, 7, 3, [SC('m1',0,0,'red'), SC('m2',0,1,'blue'), K('k1',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
+  L(78, 8, 3, [SC('m1',0,0,'red'), K('k1',0,1,1), K('k2',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
+  // === FIXTURE PACK (L79-80): legendary finale ===
+  L(79, 8, 5, [SC('m1',0,2,'red'), O('o1',3,2), O('o2',5,1), O('o3',5,3), SC('m2',0,4,'blue'), D('m3',0,0,'m1')], [E('RIGHT',2), E('RIGHT',4), E('TOP',0)], 7, 'fixture', [[2,2],[4,2]]),
+  L(80, 9, 5, [SC('m1',0,1,'red'), SC('m2',0,3,'blue'), O('o1',3,1), O('o2',3,3), K('k1',0,0,2), K('k2',0,4,2)], [E('RIGHT',1), E('RIGHT',3), E('RIGHT',0), E('RIGHT',4)], 8, 'fixture', [[2,1],[2,3]]),`;
+
+  const bakedSolutions = entries.map((e) => {
+    const moves = e.solution.map((m) => `{blockId:'${m.blockId}',dir:'${m.dir}'}`).join(', ');
+    return `  ${e.id}: [${moves}],`;
+  }).join('\n');
+
+  const fixtureSolutions = `  73: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
+  74: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'}],
+  75: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'}],
+  76: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
+  77: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
+  78: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k2',dir:'RIGHT'}],
+  79: [],
+  80: [],`;
+
+  const solutionsBody = bakedSolutions + '\n' + fixtureSolutions;
+
+  const footer = `
+];
+
+export type SolutionMove = { blockId: string; dir: Direction };
+
+export const SOLUTIONS: Record<number, SolutionMove[]> = {
+${solutionsBody}
+};
+
+export function getSolution(id: number): SolutionMove[] {
+  return SOLUTIONS[id] ?? [];
+}
+
+export function getLevel(id: number): LevelData {
+  return LEVELS[Math.max(0, Math.min(LEVELS.length - 1, id - 1))];
+}
+
+export const MAX_LEVEL_COLS = LEVELS.reduce((m, l) => Math.max(m, l.cols), 0);
+export const MAX_LEVEL_ROWS = LEVELS.reduce((m, l) => Math.max(m, l.rows), 0);
+
+export interface WorldPack {
+  id: string;
+  name: string;
+  theme: string;
+  levelIds: number[];
+  unlockAfter: number;
+}
+
+export const PACKS: WorldPack[] = [
+  { id: 'tutorial', name: 'Tutorial', theme: 'intro',     levelIds: LEVELS.filter(l => l.pack === 'tutorial').map(l => l.id), unlockAfter: 0 },
+  { id: 'hook',     name: 'Hook',     theme: 'wow',       levelIds: LEVELS.filter(l => l.pack === 'hook').map(l => l.id),     unlockAfter: 6 },
+  { id: 'gears',    name: 'Gears',    theme: 'dependent', levelIds: LEVELS.filter(l => l.pack === 'gears').map(l => l.id),    unlockAfter: 20 },
+  { id: 'stones',   name: 'Stones',   theme: 'obstacle',  levelIds: LEVELS.filter(l => l.pack === 'stones').map(l => l.id),   unlockAfter: 40 },
+  { id: 'master',   name: 'Master',   theme: 'mixed',     levelIds: LEVELS.filter(l => l.pack === 'master').map(l => l.id),   unlockAfter: 60 },
+  { id: 'fixture',  name: 'Finale',   theme: 'boss',      levelIds: LEVELS.filter(l => l.pack === 'fixture').map(l => l.id),  unlockAfter: 75 },
+];
+
+export const FIXTURE_IDS = LEVELS.filter((l) => l.id >= 73).map((l) => l.id);
+
+export function getPackOf(levelId: number): WorldPack | undefined {
+  return PACKS.find((p) => p.levelIds.includes(levelId));
+}
+
+export function starsFor(parMoves: number, moves: number): 1 | 2 | 3 {
+  if (moves <= parMoves) return 3;
+  if (moves <= Math.ceil(parMoves * 1.4)) return 2;
+  return 1;
+}
+`;
+  return header + body + '\n' + fixtures + footer;
+}
+
+// Main bake command (mirror of bake-v2): parse args, seed from existing Levels.ts if needed,
+// bake target IDs via constructive scramble, save store, emit Levels.ts.
+function runBake(repoRoot: string): void {
+  const { ids: targetIds, description } = parseBakeArgs();
+  console.log(`[constructive] Bake target: ${description} (${targetIds.length} levels)`);
+
+  const store = loadStore(repoRoot);
+  console.log(`[constructive] Store: loaded ${store.size} existing entries`);
+
+  // Bootstrap from existing Levels.ts on first run
+  let seeded = 0;
+  for (const lvl of EXISTING_LEVELS) {
+    if (lvl.id > TOTAL_BAKED) continue;
+    if (store.has(lvl.id)) continue;
+    const blocks: BlockSpec[] = lvl.blocks.map((b) => ({
+      id: b.id,
+      type: (b.type ?? 'simple') as BlockType,
+      pos: b.position as [number, number],
+      direction: b.direction,
+      dependsOn: b.dependsOn,
+    }));
+    store.set(lvl.id, {
+      id: lvl.id, cols: lvl.cols, rows: lvl.rows,
+      blocks,
+      exits: lvl.exits.map((e) => ({ side: e.side as ExitSide, index: e.index })),
+      parMoves: lvl.parMoves,
+      pack: lvl.pack ?? packOfId(lvl.id),
+      solution: (EXISTING_SOLUTIONS[lvl.id] ?? []).map((m) => ({ blockId: m.blockId, dir: m.dir as Direction })),
+    });
+    seeded++;
+  }
+  if (seeded > 0) console.log(`[constructive] Store: seeded ${seeded} entries from Levels.ts`);
+
+  // Bake target IDs via constructive
+  const t0 = Date.now();
+  for (const id of targetIds) {
+    const par = PAR_TARGETS[id - 1];
+    const pack = packOfId(id);
+    const phaseRand = rng(id * 9301);
+    const spec = generatePhase(id, par, pack, phaseRand);
+    const result = bakeOne(spec, { seedsBudget: 300, tolerance: 2, verbose: false });
+    if (!result) {
+      console.error(`L${id}: bake FAILED (no scramble produced solvable layout)`);
+      console.error('       keeping existing store entry if any');
+      continue;
+    }
+    // Reject if any movable still exited (orphan dep refs would result)
+    const anyExited = result.positions.some((p) => p === null);
+    if (anyExited) {
+      console.error(`L${id}: bake REJECTED (some movables stayed exited — dep chain broke)`);
+      console.error('       keeping existing store entry if any');
+      continue;
+    }
+    // Convert positions back to placed BlockSpec[]
+    const placedBlocks: BlockSpec[] = [];
+    for (let i = 0; i < spec.blocks.length; i++) {
+      const b = spec.blocks[i];
+      if (b.type === 'obstacle') {
+        placedBlocks.push(b);
+        continue;
+      }
+      const movableIdx = spec.blocks.filter((x) => x.type !== 'obstacle').findIndex((x) => x.id === b.id);
+      const p = result.positions[movableIdx];
+      if (!p) continue; // safety (should be unreachable after anyExited check)
+      placedBlocks.push({ ...b, pos: [p[0], p[1]] });
+    }
+    const stored: StoredLevel = {
+      id, cols: spec.cols, rows: spec.rows,
+      blocks: placedBlocks,
+      exits: spec.exits,
+      parMoves: result.par,
+      pack,
+      solution: result.solution,
+    };
+    store.set(id, stored);
+    const diff = par - result.par;
+    const mark = diff === 0 ? '✓' : diff > 0 ? '~' : '!';
+    console.log(`L${String(id).padStart(2)} (${spec.cols}x${spec.rows}, ${placedBlocks.length}b): par=${result.par}/${par} ${mark} (seed ${result.seedUsed}, ${result.attempts} attempts)`);
+  }
+  const dt = ((Date.now() - t0) / 1000).toFixed(1);
+  console.log(`[constructive] Baked in ${dt}s`);
+
+  saveStore(repoRoot, store);
+  console.log(`[constructive] Store saved → ${STORE_PATH_REL}`);
+
+  // Verify completeness for emit
+  const missing: number[] = [];
+  for (let i = 1; i <= TOTAL_BAKED; i++) if (!store.has(i)) missing.push(i);
+  if (missing.length > 0) {
+    console.error(`Cannot emit Levels.ts — store missing IDs: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+
+  const sortedEntries = [...store.values()].sort((a, b) => a.id - b.id);
+  const out = emitLevelsTs(sortedEntries);
+  const outPath = resolve(repoRoot, 'src', 'config', 'Levels.ts');
+  writeFileSync(outPath, out, 'utf8');
+  console.log(`[constructive] Wrote ${outPath}`);
 }
 
 // ============================================================
@@ -655,17 +1278,17 @@ const isMain = process.argv[1] === __filename;
 if (isMain) {
   const cmd = process.argv[2];
   if (cmd === 'test') {
-    const id = process.argv[3] ? parseInt(process.argv[3], 10) : 1;
+    const id = process.argv[3] ? parseInt(process.argv[3], 10) : undefined;
     dryrunSample(id);
   } else if (cmd === 'bake') {
-    console.error('[bake-constructive] full bake not implemented yet — foundation only');
-    process.exit(1);
+    const repoRoot = resolve(dirname(__filename), '..');
+    runBake(repoRoot);
   } else {
     console.log('Usage:');
-    console.log('  npx tsx scripts/bake-constructive.ts test [phaseId]   # single-level scramble dryrun');
-    console.log('  npx tsx scripts/bake-constructive.ts bake             # NOT YET IMPLEMENTED');
+    console.log('  npx tsx scripts/bake-constructive.ts test [phaseIdx]               # dryrun samples');
+    console.log('  npx tsx scripts/bake-constructive.ts bake                          # bake all 72');
+    console.log('  npx tsx scripts/bake-constructive.ts bake --pack=stones            # only stones');
+    console.log('  npx tsx scripts/bake-constructive.ts bake --ids=44-50              # range');
+    console.log('  npx tsx scripts/bake-constructive.ts bake --ids=44,52,58           # specific');
   }
 }
-
-// Suppress unused-import warning when not running CLI.
-void resolve; void dirname; void writeFileSync;

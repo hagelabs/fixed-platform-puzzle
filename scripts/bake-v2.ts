@@ -342,11 +342,11 @@ function inferPhase(idx: number, par: number, side: ExitSide): Phase {
     else if (par <= 5) { movables = 3; yellows = 1; deps = 1; obstacles = 1; depthMode = 'linear'; }
     else { movables = 3; yellows = 1; deps = 1; obstacles = 2; depthMode = 'linear'; }
   } else if (pack === 'hook') {
-    // 3-4 movables, dependent showcase
+    // Brief targets: 6-12. Forces wow-moments: dependent + chain.
     movables = par <= 8 ? 3 : 4;
     yellows = 1;
     deps = par >= 9 ? 2 : 1;
-    obstacles = par >= 10 ? 2 : 1;
+    obstacles = par >= 10 ? 3 : par >= 8 ? 2 : 1;
     depthMode = deps >= 2 ? 'linear' : 'linear';
   } else if (pack === 'gears') {
     // chain depth 2-3, par 10-18
@@ -373,12 +373,12 @@ function inferPhase(idx: number, par: number, side: ExitSide): Phase {
     if (par >= 21) exits = 2;
   }
 
-  // Tutorial: tight band (must hit brief par exactly within ±1)
-  const tight = pack === 'tutorial';
+  // Tutorial + Hook: tight band (must hit brief par within ±1-2)
+  const tight = pack === 'tutorial' || pack === 'hook';
   return {
     cols, rows, movables, yellows, deps, obstacles, exits,
-    optMin: tight ? par : Math.max(1, par - 2),
-    optMax: tight ? par + 1 : par + 3,
+    optMin: tight ? Math.max(1, par - 1) : Math.max(1, par - 2),
+    optMax: tight ? par + 2 : par + 3,
     depthMode,
     primarySide: side,
   };

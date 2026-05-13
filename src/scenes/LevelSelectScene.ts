@@ -5,6 +5,7 @@ import { AudioManager } from '../managers/AudioManager';
 import { AdManager } from '../managers/AdManager';
 import { SDKManager } from '../managers/SDKManager';
 import { fadeIn, fadeOutAndStart } from '../utils/Effects';
+import { PACKS, getPackOf } from '../config/Levels';
 import {
   TOKENS,
   FONT_NEO,
@@ -19,8 +20,21 @@ import {
 } from '../ui/Theme';
 
 export class LevelSelectScene extends Phaser.Scene {
+  private gridLayer?: Phaser.GameObjects.Container;
+  private activePackId: string = 'tutorial';
+
   constructor() {
     super({ key: SCENE_KEYS.LevelSelect });
+  }
+
+  init(data?: { activePackId?: string }): void {
+    if (data?.activePackId) {
+      this.activePackId = data.activePackId;
+    } else {
+      const store = useGameStore.getState();
+      const currentPack = getPackOf(store.currentLevel);
+      this.activePackId = currentPack?.id ?? 'tutorial';
+    }
   }
 
   create(): void {
@@ -73,31 +87,67 @@ export class LevelSelectScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     popIn(this, header, 100);
-    this.tweens.add({
-      targets: header,
-      scale: 1.04,
-      duration: 1600,
-      delay: 600,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
 
+    this.drawPackTabs(width, 210);
+    this.gridLayer = this.add.container(0, 0);
+    this.renderPackGrid(this.activePackId, width, height);
+  }
+
+  private drawPackTabs(width: number, y: number): void {
+    const tabW = 380;
+    const gap = 40;
+    const totalW = PACKS.length * tabW + (PACKS.length - 1) * gap;
+    const startX = (width - totalW) / 2 + tabW / 2;
     const store = useGameStore.getState();
-    const cols = 10;
-    const rows = Math.ceil(TOTAL_LEVELS / cols);
-    const tile = 100;
-    const gapX = 26;
+
+    PACKS.forEach((pack, i) => {
+      const x = startX + i * (tabW + gap);
+      const packUnlocked = store.unlockedLevel >= pack.unlockAfter + 1;
+      const active = pack.id === this.activePackId;
+      const fill = !packUnlocked ? TOKENS.lockGray : active ? TOKENS.sky : TOKENS.white;
+      const stars = pack.levelIds.reduce((sum, id) => sum + store.starsFor(id), 0);
+      const maxStars = pack.levelIds.length * 3;
+      const label = `${pack.name.toUpperCase()}  ${stars}/${maxStars}★`;
+
+      const btn = neoButton(
+        this,
+        x,
+        y,
+        tabW,
+        100,
+        label,
+        fill,
+        () => {
+          if (!packUnlocked) return;
+          AudioManager.uiTap();
+          this.scene.start(SCENE_KEYS.LevelSelect, { activePackId: pack.id });
+        },
+        { textSize: 24 },
+      );
+      if (!packUnlocked) btn.setEnabled(false);
+      slideUpIn(this, btn.container, 160 + i * 60);
+    });
+  }
+
+  private renderPackGrid(packId: string, width: number, height: number): void {
+    const pack = PACKS.find((p) => p.id === packId);
+    if (!pack) return;
+    const store = useGameStore.getState();
+
+    const cols = 6;
+    const levelIds = pack.levelIds;
+    const rows = Math.ceil(levelIds.length / cols);
+    const tile = 110;
+    const gapX = 30;
     const gapY = 32;
     const gridW = cols * tile + (cols - 1) * gapX;
     const gridH = rows * tile + (rows - 1) * gapY;
     const startX = (width - gridW) / 2 + tile / 2;
-    const startY = 234 + tile / 2;
-    const usableY = height - 180;
+    const startY = 380 + tile / 2;
+    const usableY = height - 120;
     const adjStartY = startY + gridH > usableY ? usableY - gridH + tile / 2 : startY;
 
-    for (let i = 0; i < TOTAL_LEVELS; i++) {
-      const lvl = i + 1;
+    levelIds.forEach((lvl, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
       const x = startX + col * (tile + gapX);
@@ -123,13 +173,14 @@ export class LevelSelectScene extends Phaser.Scene {
         },
         { textSize: 40, textColor: TOKENS.inkHex },
       );
+      this.gridLayer?.add(btn.container);
 
       btn.container.setScale(0);
       this.tweens.add({
         targets: btn.container,
         scale: 1,
-        duration: 320,
-        delay: 140 + i * 18,
+        duration: 280,
+        delay: 240 + i * 14,
         ease: 'Back.easeOut',
       });
 
@@ -138,40 +189,38 @@ export class LevelSelectScene extends Phaser.Scene {
         btn.container.setAlpha(0.85);
         const lock = drawLockIcon(this, 0, 0, 22, 0x9a9a9a);
         btn.container.add(lock);
+      } else {
+        const stars = store.starsFor(lvl);
+        if (stars > 0) {
+          const pips = this.makeStarPips(stars);
+          pips.setPosition(0, tile / 2 - 14);
+          btn.container.add(pips);
+        }
       }
 
       if (isCurrent && !locked) {
-        this.time.delayedCall(140 + i * 18 + 320, () => {
+        this.time.delayedCall(240 + i * 14 + 280, () => {
           idlePulse(this, btn.container, 1.08, 900);
-          const halo = this.add.graphics();
-          halo.lineStyle(6, TOKENS.ink, 1);
-          halo.strokeCircle(0, 0, tile * 0.85);
-          halo.setAlpha(0);
-          btn.container.add(halo);
-          this.tweens.add({
-            targets: halo,
-            scale: { from: 0.7, to: 1.4 },
-            alpha: { from: 0.55, to: 0 },
-            duration: 1100,
-            repeat: -1,
-            ease: 'Sine.easeOut',
-          });
         });
       }
+    });
+  }
 
-      if (!locked) {
-        btn.container.on('pointerover', () => {
-          this.tweens.add({
-            targets: btn.container,
-            angle: { from: -3, to: 3 },
-            duration: 120,
-            yoyo: true,
-            ease: 'Sine.easeInOut',
-            onComplete: () => btn.container.setAngle(0),
-          });
-        });
-      }
+  private makeStarPips(earned: number): Phaser.GameObjects.Container {
+    const c = this.add.container(0, 0);
+    const r = 6;
+    const gap = 14;
+    for (let i = 0; i < 3; i++) {
+      const x = -gap + i * gap;
+      const filled = i < earned;
+      const dot = this.add.graphics();
+      dot.fillStyle(filled ? 0xFFD23F : 0xCCCCCC, 1);
+      dot.lineStyle(2, 0x222222, 1);
+      dot.fillCircle(x, 0, r);
+      dot.strokeCircle(x, 0, r);
+      c.add(dot);
     }
+    return c;
   }
 
   private spawnAmbientDecor(): void {
@@ -183,8 +232,6 @@ export class LevelSelectScene extends Phaser.Scene {
     }> = [
       { x: 54, y: height - 54, size: 50, fill: TOKENS.red },
       { x: width - 54, y: height - 72, size: 58, fill: TOKENS.yellow, icon: 'chevron', iconDir: 'LEFT' },
-      { x: 64, y: 200, size: 44, fill: TOKENS.blue, icon: 'chain' },
-      { x: width - 64, y: 200, size: 46, fill: TOKENS.mint },
     ];
     decor.forEach((d, i) => {
       const node = floatingDecor(this, d.x, d.y, d.size, d.fill, {

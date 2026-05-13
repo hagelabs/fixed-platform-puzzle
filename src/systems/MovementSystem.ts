@@ -19,12 +19,15 @@ const DELTA: Record<Direction, [number, number]> = {
 export type SlideResult =
   | { kind: 'exit'; side: ExitSide; toCol: number; toRow: number; distance: number }
   | { kind: 'slide'; toCol: number; toRow: number; distance: number }
-  | { kind: 'invalid'; reason: 'blocked' | 'wrong_dir' | 'locked' | 'no_exit' };
+  | { kind: 'invalid'; reason: 'blocked' | 'wrong_dir' | 'locked' | 'no_exit' | 'ice_stop' };
 
 export class MovementSystem {
   public slide(block: Block, grid: Grid, dir: Direction, allBlocks: Block[]): SlideResult {
     if (block.removed) return { kind: 'invalid', reason: 'blocked' };
     if (block.type === 'obstacle') return { kind: 'invalid', reason: 'blocked' };
+    if (block.type === 'lock' && !grid.isColorUnlocked(block.color)) {
+      return { kind: 'invalid', reason: 'locked' };
+    }
     if (block.type === 'dependent' && !this.depsCleared(block, allBlocks)) {
       return { kind: 'invalid', reason: 'locked' };
     }
@@ -50,6 +53,7 @@ export class MovementSystem {
           return { kind: 'exit', side, toCol: curCol, toRow: curRow, distance };
         }
         if (distance === 0) return { kind: 'invalid', reason: 'blocked' };
+        if (grid.hasIce(curCol, curRow)) return { kind: 'invalid', reason: 'ice_stop' };
         return { kind: 'slide', toCol: curCol, toRow: curRow, distance };
       }
 
@@ -57,6 +61,7 @@ export class MovementSystem {
       if (occ && occ !== block) {
         const distance = Math.abs(curCol - startCol) + Math.abs(curRow - startRow);
         if (distance === 0) return { kind: 'invalid', reason: 'blocked' };
+        if (grid.hasIce(curCol, curRow)) return { kind: 'invalid', reason: 'ice_stop' };
         return { kind: 'slide', toCol: curCol, toRow: curRow, distance };
       }
 

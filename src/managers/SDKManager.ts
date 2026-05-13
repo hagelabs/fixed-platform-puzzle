@@ -1,6 +1,6 @@
 import { AudioManager } from './AudioManager';
 
-type Platform = 'poki' | 'crazygames' | 'none';
+type Platform = 'poki' | 'crazygames' | 'gamedistribution' | 'none';
 type RewardedSize = 'small' | 'medium' | 'large';
 
 interface PokiAPI {
@@ -30,12 +30,19 @@ interface CrazyAPI {
   };
 }
 
+interface GDSDK {
+  showAd?: (type?: string) => Promise<void>;
+  preloadAd?: (type?: string) => Promise<void>;
+}
+
 declare const __BUILD_TARGET__: string;
 
 declare global {
   interface Window {
     PokiSDK?: PokiAPI;
     CrazyGames?: CrazyAPI;
+    gdsdk?: GDSDK;
+    GD_OPTIONS?: { gameId?: string };
   }
 }
 
@@ -47,10 +54,16 @@ class SDKManagerImpl {
   private adInFlight = false;
 
   detect(): Platform {
-    if (typeof __BUILD_TARGET__ !== 'undefined' && __BUILD_TARGET__ === 'itch') return 'none';
+    if (typeof __BUILD_TARGET__ !== 'undefined') {
+      if (__BUILD_TARGET__ === 'itch') return 'none';
+      if (__BUILD_TARGET__ === 'poki') return 'poki';
+      if (__BUILD_TARGET__ === 'crazygames') return 'crazygames';
+      if (__BUILD_TARGET__ === 'gamedistribution') return 'gamedistribution';
+    }
     const host = window.location.hostname;
     if (host.includes('poki') || window.PokiSDK) return 'poki';
     if (host.includes('crazygames') || window.CrazyGames) return 'crazygames';
+    if (host.includes('gamedistribution') || window.gdsdk) return 'gamedistribution';
     return 'none';
   }
 
@@ -59,7 +72,7 @@ class SDKManagerImpl {
   }
 
   hasRewardedAds(): boolean {
-    return this.platform === 'poki' || this.platform === 'crazygames';
+    return this.platform === 'poki' || this.platform === 'crazygames' || this.platform === 'gamedistribution';
   }
 
   async init(): Promise<void> {
@@ -70,6 +83,9 @@ class SDKManagerImpl {
       } else if (this.platform === 'crazygames' && window.CrazyGames?.SDK?.init) {
         await window.CrazyGames.SDK.init();
         window.CrazyGames.SDK.game?.loadingStart?.();
+      } else if (this.platform === 'gamedistribution') {
+        // SDK auto-inits via GD_OPTIONS in HTML; nothing to await
+        await this.waitFor(() => !!window.gdsdk, 2000);
       }
       this.ready = true;
       console.info('[SDK]', this.platform, 'ready');
@@ -127,6 +143,9 @@ class SDKManagerImpl {
       } else if (this.platform === 'crazygames' && window.CrazyGames?.SDK?.ad?.requestAd) {
         this.gameplayStop();
         await this.withTimeout(window.CrazyGames.SDK.ad.requestAd('midgame'), undefined);
+      } else if (this.platform === 'gamedistribution' && window.gdsdk?.showAd) {
+        this.gameplayStop();
+        await this.withTimeout(window.gdsdk.showAd(), undefined);
       }
     } catch (e) {
       console.warn('[ad] commercialBreak failed', e);
@@ -152,6 +171,10 @@ class SDKManagerImpl {
         await this.withTimeout(window.CrazyGames.SDK.ad.requestAd('rewarded'), undefined);
         return true;
       }
+      if (this.platform === 'gamedistribution' && window.gdsdk?.showAd) {
+        await this.withTimeout(window.gdsdk.showAd('rewarded'), undefined);
+        return true;
+      }
       return await this.dummyRewarded();
     } catch (e) {
       console.warn('[ad] rewarded failed', e);
@@ -175,6 +198,17 @@ class SDKManagerImpl {
 
   private dummyRewarded(): Promise<boolean> {
     return new Promise((resolve) => setTimeout(() => resolve(true), 700));
+  }
+
+  private waitFor(cond: () => boolean, ms: number): Promise<void> {
+    const start = Date.now();
+    return new Promise((resolve) => {
+      const tick = () => {
+        if (cond() || Date.now() - start >= ms) resolve();
+        else setTimeout(tick, 100);
+      };
+      tick();
+    });
   }
 }
 

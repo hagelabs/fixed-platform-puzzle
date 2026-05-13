@@ -9,10 +9,13 @@
     "analyze": "webpack --config webpack.config.js --mode production --env analyze",
     "size": "du -sh dist/ && ls -lh dist/",
     "validate-levels": "tsx scripts/validate-levels.ts",
-    "bake-levels": "tsx scripts/bake-levels.ts",
-    "package:poki": "npm run build && cd dist && zip -r ../submission/poki-build.zip . && cd ..",
-    "package:crazygames": "npm run build && cd dist && zip -r ../submission/crazygames-build.zip . && cd ..",
-    "package:itch": "tsx scripts/package-itch.ts"
+    "bake-levels": "tsx scripts/bake-v2.ts",
+    "bake-legacy": "tsx scripts/bake-legacy.ts",
+    "package:poki": "tsx scripts/package.ts poki",
+    "package:crazygames": "tsx scripts/package.ts crazygames",
+    "package:gamedistribution": "tsx scripts/package.ts gamedistribution",
+    "package:itch": "tsx scripts/package.ts itch",
+    "release": "tsx scripts/release.ts"
   },
   "keywords": [
     "phaser",

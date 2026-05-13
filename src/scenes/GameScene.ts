@@ -1,16 +1,23 @@
-import Phaser from 'phaser';
-import { SCENE_KEYS, HUD_HEIGHT, COLORS } from '../config/Constants';
-import { useGameStore } from '../managers/GameStateManager';
-import { getLevel, getSolution, MAX_LEVEL_COLS, MAX_LEVEL_ROWS, SolutionMove } from '../config/Levels';
-import { Grid } from '../entities/Grid';
-import { Block } from '../entities/Block';
-import { InputManager } from '../managers/InputManager';
-import { MovementSystem } from '../systems/MovementSystem';
-import { Direction, MoveHistoryEntry } from '../types/Game';
-import { AudioManager } from '../managers/AudioManager';
-import { Analytics } from '../managers/AnalyticsManager';
-import { SDKManager } from '../managers/SDKManager';
-import { AdManager } from '../managers/AdManager';
+import Phaser from "phaser";
+import { SCENE_KEYS, HUD_HEIGHT, COLORS } from "../config/Constants";
+import { useGameStore } from "../managers/GameStateManager";
+import {
+  getLevel,
+  getSolution,
+  MAX_LEVEL_COLS,
+  MAX_LEVEL_ROWS,
+  SolutionMove,
+} from "../config/Levels";
+import { Grid } from "../entities/Grid";
+import { Block } from "../entities/Block";
+import { InputManager } from "../managers/InputManager";
+import { MovementSystem } from "../systems/MovementSystem";
+import { suggestMove } from "../systems/HintSystem";
+import { Direction, MoveHistoryEntry } from "../types/Game";
+import { AudioManager } from "../managers/AudioManager";
+import { Analytics } from "../managers/AnalyticsManager";
+import { SDKManager } from "../managers/SDKManager";
+import { AdManager } from "../managers/AdManager";
 import {
   burstParticles,
   fadeIn,
@@ -20,7 +27,7 @@ import {
   removalBloom,
   deadEndPulse,
   portalSuck,
-} from '../utils/Effects';
+} from "../utils/Effects";
 import {
   TOKENS,
   FONT_NEO,
@@ -28,8 +35,8 @@ import {
   neoPill,
   dottedBackground,
   NeoButtonHandle,
-} from '../ui/Theme';
-import { LevelTutorial, LEVEL_TUTORIALS } from '../ui/LevelTutorial';
+} from "../ui/Theme";
+import { LevelTutorial, LEVEL_TUTORIALS } from "../ui/LevelTutorial";
 
 export class GameScene extends Phaser.Scene {
   private grid!: Grid;
@@ -41,6 +48,7 @@ export class GameScene extends Phaser.Scene {
   private movesText!: Phaser.GameObjects.Text;
   private undoBtn!: NeoButtonHandle;
   private watchBtn!: NeoButtonHandle;
+  private hintBtn!: NeoButtonHandle;
   private restartBtn!: NeoButtonHandle;
   private deadEndShown = false;
 
@@ -70,7 +78,7 @@ export class GameScene extends Phaser.Scene {
     this.comboCount = 0;
     this.lastRemovalAt = 0;
     this.autoplayToken++;
-    Analytics.log('level_started', { level: store.currentLevel });
+    Analytics.log("level_started", { level: store.currentLevel });
 
     await AdManager.preLevelInterstitial();
     SDKManager.gameplayStart();
@@ -78,19 +86,28 @@ export class GameScene extends Phaser.Scene {
     dottedBackground(this);
     this.input.topOnly = true;
     this.hovered = null;
-    this.input.on('pointermove', this.refreshHover, this);
-    this.input.on('pointerdown', this.onPointerDownHint, this);
-    this.events.on('block:settled', this.refreshHover, this);
+    this.input.on("pointermove", this.refreshHover, this);
+    this.input.on("pointerdown", this.onPointerDownHint, this);
+    this.events.on("block:settled", this.refreshHover, this);
     this.movement = new MovementSystem();
 
     const levelData = getLevel(store.currentLevel);
-    this.grid = new Grid(this, levelData.cols, levelData.rows, levelData.exits, {
-      cols: MAX_LEVEL_COLS,
-      rows: MAX_LEVEL_ROWS,
-    });
+    this.grid = new Grid(
+      this,
+      levelData.cols,
+      levelData.rows,
+      levelData.exits,
+      {
+        cols: MAX_LEVEL_COLS,
+        rows: MAX_LEVEL_ROWS,
+      },
+      levelData.iceCells ?? [],
+    );
 
     this.blocks = [];
-    this.input2 = new InputManager(this, (block, dir) => this.handleSwipe(block, dir));
+    this.input2 = new InputManager(this, (block, dir) =>
+      this.handleSwipe(block, dir),
+    );
 
     levelData.blocks.forEach((bd) => {
       const block = new Block(this, bd, this.grid);
@@ -103,7 +120,7 @@ export class GameScene extends Phaser.Scene {
     // Snapshot initial locked state for unlockChime detection
     this.prevLocked.clear();
     for (const b of this.blocks) {
-      if (b.type === 'dependent') this.prevLocked.set(b.blockId, b.isLocked());
+      if (b.type === "dependent" || b.type === "lock") this.prevLocked.set(b.blockId, b.isLocked());
     }
 
     this.drawHud();
@@ -112,19 +129,19 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.autoplayToken++;
       SDKManager.gameplayStop();
-      this.input.off('pointermove', this.refreshHover, this);
-      this.input.off('pointerdown', this.onPointerDownHint, this);
-      this.events.off('block:settled', this.refreshHover, this);
-      this.events.off('tutorial:moved', this.dismissTutorial, this);
+      this.input.off("pointermove", this.refreshHover, this);
+      this.input.off("pointerdown", this.onPointerDownHint, this);
+      this.events.off("block:settled", this.refreshHover, this);
+      this.events.off("tutorial:moved", this.dismissTutorial, this);
       this.tutorial?.destroy();
       this.tutorial = undefined;
       this.hovered = null;
       AudioManager.stopAmbient();
     });
 
-    const willAutoplay = !!this.registry.get('autoplaySolution');
+    const willAutoplay = !!this.registry.get("autoplaySolution");
     if (willAutoplay) {
-      this.registry.remove('autoplaySolution');
+      this.registry.remove("autoplaySolution");
       this.time.delayedCall(400, () => this.runAutoplay());
     } else {
       this.maybeShowTutorial();
@@ -139,7 +156,7 @@ export class GameScene extends Phaser.Scene {
     if (store.hasSeenTutorial(level)) return;
     this.tutorial = new LevelTutorial(this);
     this.tutorial.show(cfg, this.blocks, this.grid);
-    this.events.on('tutorial:moved', this.dismissTutorial, this);
+    this.events.on("tutorial:moved", this.dismissTutorial, this);
   }
 
   private dismissTutorial(): void {
@@ -148,15 +165,15 @@ export class GameScene extends Phaser.Scene {
     useGameStore.getState().markTutorialSeen(level);
     this.tutorial.dismiss();
     this.tutorial = undefined;
-    this.events.off('tutorial:moved', this.dismissTutorial, this);
+    this.events.off("tutorial:moved", this.dismissTutorial, this);
   }
 
   private refreshHover(): void {
     const p = this.input.activePointer;
     let next: Block | null = null;
     for (const b of this.blocks) {
-      if (b.removed || b.type === 'obstacle') continue;
-      if (b.type === 'dependent' && b.isLocked()) continue;
+      if (b.removed || b.type === "obstacle") continue;
+      if ((b.type === "dependent" || b.type === "lock") && b.isLocked()) continue;
       if (b.containsPointer(p.worldX, p.worldY)) {
         next = b;
         break;
@@ -216,13 +233,13 @@ export class GameScene extends Phaser.Scene {
       scale: 1,
       alpha: 1,
       duration: 200,
-      ease: 'Back.easeOut',
+      ease: "Back.easeOut",
     });
     this.tweens.add({
       targets: container,
       angle: 60,
       duration: 1100,
-      ease: 'Sine.easeInOut',
+      ease: "Sine.easeInOut",
     });
     this.tweens.add({
       targets: container,
@@ -230,7 +247,7 @@ export class GameScene extends Phaser.Scene {
       scale: 1.18,
       duration: 700,
       delay: 400,
-      ease: 'Sine.easeIn',
+      ease: "Sine.easeIn",
       onComplete: () => container.destroy(),
     });
   }
@@ -240,12 +257,19 @@ export class GameScene extends Phaser.Scene {
     const store = useGameStore.getState();
 
     const headerY = 64;
-    this.drawHudLabel(116, headerY, 172, 86, `LV ${store.currentLevel}`, TOKENS.mint);
+    this.drawHudLabel(
+      116,
+      headerY,
+      172,
+      86,
+      `LV ${store.currentLevel}`,
+      TOKENS.mint,
+    );
 
     this.movesText = this.add
       .text(width / 2, headerY, `MOVES: 0`, {
         fontFamily: FONT_NEO,
-        fontSize: '32px',
+        fontSize: "32px",
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
@@ -254,7 +278,7 @@ export class GameScene extends Phaser.Scene {
       this,
       width - 64,
       headerY,
-      'II',
+      "II",
       () => {
         AudioManager.pauseSwoosh();
         this.scene.launch(SCENE_KEYS.Pause);
@@ -264,29 +288,40 @@ export class GameScene extends Phaser.Scene {
     );
 
     const bottomY = this.scale.height - 55;
-    const btnW = 220;
-    const btnSpacing = 240;
+    const btnW = 200;
+    const btnSpacing = 220;
     this.undoBtn = neoButton(
       this,
-      width / 2 - btnSpacing,
+      width / 2 - btnSpacing * 1.5,
       bottomY,
       btnW,
       86,
-      'UNDO',
+      "UNDO",
       TOKENS.yellow,
       () => this.undo(),
-      { textSize: 34 },
+      { textSize: 32 },
+    );
+    this.hintBtn = neoButton(
+      this,
+      width / 2 - btnSpacing * 0.5,
+      bottomY,
+      btnW,
+      86,
+      "HINT",
+      TOKENS.sky,
+      () => this.requestHint(),
+      { textSize: 32 },
     );
     this.watchBtn = neoButton(
       this,
-      width / 2,
+      width / 2 + btnSpacing * 0.5,
       bottomY,
       btnW,
       86,
-      'WATCH',
+      "SKIP",
       TOKENS.mint,
       () => this.requestWatch(),
-      { textSize: 28 },
+      { textSize: 26 },
     );
     this.refreshWatchLabel();
     this.time.addEvent({
@@ -296,35 +331,113 @@ export class GameScene extends Phaser.Scene {
     });
     this.restartBtn = neoButton(
       this,
-      width / 2 + btnSpacing,
+      width / 2 + btnSpacing * 1.5,
       bottomY,
       btnW,
       86,
-      'RESTART',
+      "RESTART",
       TOKENS.danger,
       () => {
         if (this.watchPlaying) return;
         this.scene.restart();
       },
-      { textSize: 34 },
+      { textSize: 32 },
     );
+  }
+
+  private async requestHint(): Promise<void> {
+    if (this.busy || this.watchPlaying) return;
+    AudioManager.uiTap();
+    if (SDKManager.hasRewardedAds()) {
+      this.hintBtn.setEnabled(false);
+      const ok = await AdManager.showRewarded("hint");
+      this.hintBtn.setEnabled(true);
+      if (!ok) {
+        AudioManager.thud();
+        return;
+      }
+    }
+    const level = getLevel(useGameStore.getState().currentLevel);
+    const move = suggestMove(this.blocks, this.grid, level.iceCells ?? [], 50000, 80);
+    if (!move) {
+      this.hintBtn.setLabel("NO HINT");
+      this.time.delayedCall(1400, () => this.hintBtn.setLabel("HINT"));
+      AudioManager.thud();
+      return;
+    }
+    Analytics.track("hint_used", { type: "single", levelId: useGameStore.getState().currentLevel, blockId: move.blockId, dir: move.dir });
+    this.showHintArrow(move.blockId, move.dir);
+  }
+
+  private showHintArrow(blockId: string, dir: Direction): void {
+    const block = this.blocks.find((b) => b.blockId === blockId);
+    if (!block) return;
+    const offset = this.grid.cellSize * 0.7;
+    const dx = dir === 'LEFT' ? -offset : dir === 'RIGHT' ? offset : 0;
+    const dy = dir === 'UP' ? -offset : dir === 'DOWN' ? offset : 0;
+    const baseX = block.x;
+    const baseY = block.y;
+    const arrow = this.add.graphics();
+    arrow.fillStyle(0x55B4FF, 1);
+    arrow.lineStyle(4, 0x222222, 1);
+    const s = this.grid.cellSize * 0.35;
+    const angle =
+      dir === 'RIGHT' ? 0 : dir === 'DOWN' ? Math.PI / 2 : dir === 'LEFT' ? Math.PI : -Math.PI / 2;
+    arrow.fillTriangle(s * 0.6, 0, -s * 0.4, s * 0.5, -s * 0.4, -s * 0.5);
+    arrow.strokeTriangle(s * 0.6, 0, -s * 0.4, s * 0.5, -s * 0.4, -s * 0.5);
+    arrow.setPosition(baseX + dx, baseY + dy);
+    arrow.setRotation(angle);
+    arrow.setAlpha(0);
+    this.tweens.add({
+      targets: arrow,
+      alpha: 1,
+      scale: { from: 0.6, to: 1 },
+      duration: 240,
+      ease: 'Back.easeOut',
+    });
+    this.tweens.add({
+      targets: arrow,
+      x: arrow.x + dx * 0.2,
+      y: arrow.y + dy * 0.2,
+      duration: 700,
+      yoyo: true,
+      repeat: 2,
+      ease: 'Sine.easeInOut',
+    });
+    this.time.delayedCall(2800, () => {
+      this.tweens.add({
+        targets: arrow,
+        alpha: 0,
+        duration: 280,
+        onComplete: () => arrow.destroy(),
+      });
+    });
+    // pulse the block
+    this.tweens.add({
+      targets: block,
+      scale: { from: 1, to: 1.08 },
+      duration: 380,
+      yoyo: true,
+      repeat: 2,
+      ease: 'Sine.easeInOut',
+    });
   }
 
   private refreshWatchLabel(): void {
     const store = useGameStore.getState();
     if (SDKManager.hasRewardedAds()) {
-      this.watchBtn.setLabel('WATCH AD');
+      this.watchBtn.setLabel("WATCH AD");
       this.watchBtn.setEnabled(!this.watchPlaying);
       return;
     }
     const sec = store.getWatchCooldownSecondsLeft();
     if (sec <= 0) {
-      this.watchBtn.setLabel('WATCH');
+      this.watchBtn.setLabel("WATCH");
       this.watchBtn.setEnabled(!this.watchPlaying);
     } else {
       const m = Math.floor(sec / 60);
       const s = sec % 60;
-      this.watchBtn.setLabel(`${m}:${String(s).padStart(2, '0')}`);
+      this.watchBtn.setLabel(`${m}:${String(s).padStart(2, "0")}`);
       this.watchBtn.setEnabled(false);
       if (sec > 0 && sec <= 3) AudioManager.tick();
     }
@@ -336,7 +449,7 @@ export class GameScene extends Phaser.Scene {
 
     if (SDKManager.hasRewardedAds()) {
       this.watchBtn.setEnabled(false);
-      const ok = await AdManager.showRewarded('hint');
+      const ok = await AdManager.showRewarded("hint");
       if (!ok) {
         AudioManager.thud();
         this.refreshWatchLabel();
@@ -352,10 +465,10 @@ export class GameScene extends Phaser.Scene {
       store.startWatchCooldown();
     }
 
-    Analytics.log('hint_used', { type: 'watch_solution' });
+    Analytics.log("hint_used", { type: "watch_solution" });
     this.refreshWatchLabel();
 
-    this.registry.set('autoplaySolution', true);
+    this.registry.set("autoplaySolution", true);
     this.scene.restart();
   }
 
@@ -427,11 +540,17 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(TOKENS.ink, 1);
     g.fillRoundedRect(-w / 2, -h / 2, w, h, cornerR);
     g.fillStyle(fill, 1);
-    g.fillRoundedRect(-w / 2 + border, -h / 2 + border, w - border * 2, h - border * 2, cornerR - 4);
+    g.fillRoundedRect(
+      -w / 2 + border,
+      -h / 2 + border,
+      w - border * 2,
+      h - border * 2,
+      cornerR - 4,
+    );
     const txt = this.add
       .text(0, 0, label, {
         fontFamily: FONT_NEO,
-        fontSize: '32px',
+        fontSize: "32px",
         color: TOKENS.inkHex,
       })
       .setOrigin(0.5);
@@ -454,7 +573,7 @@ export class GameScene extends Phaser.Scene {
       this.grid.place(block);
       block.moveToCell(this.grid, entry.prevPos[0], entry.prevPos[1], true, 1);
       AudioManager.uiTap();
-      Analytics.log('hint_used', { type: 'undo' });
+      Analytics.log("hint_used", { type: "undo" });
       this.deadEndShown = false;
       return;
     }
@@ -467,27 +586,31 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.watchPlaying && !this.autoplayActive) return;
-    if (block.removed || block.type === 'obstacle') return;
+    if (block.removed || block.type === "obstacle") return;
 
     const result = this.movement.slide(block, this.grid, dir, this.blocks);
 
-    if (result.kind === 'invalid') {
-      if (result.reason === 'wrong_dir') AudioManager.constraintReject();
-      else if (result.reason === 'locked') AudioManager.thud();
+    if (result.kind === "invalid") {
+      if (result.reason === "wrong_dir") AudioManager.constraintReject();
+      else if (result.reason === "locked") AudioManager.thud();
       else AudioManager.bump();
       this.shake(block);
-      Analytics.log('hint_used', { invalid: result.reason });
+      Analytics.log("hint_used", { invalid: result.reason });
       return;
     }
 
     const pan = this.computePan(block.gridPos[0]);
 
-    Analytics.log('block_moved', { dir, color: block.color, kind: result.kind });
+    Analytics.log("block_moved", {
+      dir,
+      color: block.color,
+      kind: result.kind,
+    });
     const store = useGameStore.getState();
     store.incMoves();
     this.movesText.setText(`MOVES: ${useGameStore.getState().movesThisLevel}`);
 
-    if (result.kind === 'slide') {
+    if (result.kind === "slide") {
       this.history.push({
         blockId: block.blockId,
         prevPos: [...block.gridPos] as [number, number],
@@ -498,14 +621,20 @@ export class GameScene extends Phaser.Scene {
       this.grid.place(block);
       this.busy = true;
       AudioManager.slideStart(result.distance, pan);
-      block.moveToCell(this.grid, result.toCol, result.toRow, true, result.distance);
+      block.moveToCell(
+        this.grid,
+        result.toCol,
+        result.toRow,
+        true,
+        result.distance,
+      );
       this.time.delayedCall(Math.min(360, 90 + result.distance * 38), () => {
         block.squash(dir);
         dustPuff(this, block.x, block.y, dir);
         screenshake(this, 0.003, 80);
         AudioManager.slideEnd(result.distance, this.computePan(result.toCol));
         this.busy = false;
-        this.events.emit('tutorial:moved');
+        this.events.emit("tutorial:moved");
         this.checkDeadEnd();
       });
       return;
@@ -525,13 +654,17 @@ export class GameScene extends Phaser.Scene {
     AudioManager.slideStart(result.distance, pan);
 
     const lastInCol =
-      dir === 'RIGHT' ? result.toCol - 1
-      : dir === 'LEFT' ? result.toCol + 1
-      : result.toCol;
+      dir === "RIGHT"
+        ? result.toCol - 1
+        : dir === "LEFT"
+          ? result.toCol + 1
+          : result.toCol;
     const lastInRow =
-      dir === 'DOWN' ? result.toRow - 1
-      : dir === 'UP' ? result.toRow + 1
-      : result.toRow;
+      dir === "DOWN"
+        ? result.toRow - 1
+        : dir === "UP"
+          ? result.toRow + 1
+          : result.toRow;
     const slideDist =
       Math.abs(lastInCol - startCol) + Math.abs(lastInRow - startRow);
     const exitColor = COLORS[block.color];
@@ -553,20 +686,26 @@ export class GameScene extends Phaser.Scene {
         screenshake(this, 0.005, 110);
       },
       () => {
+        this.grid.unlockColor(block.color);
         this.refreshDependents();
         this.afterRemove();
         this.busy = false;
       },
     );
-    this.events.emit('tutorial:moved');
+    this.events.emit("tutorial:moved");
   }
 
   private refreshDependents(): void {
     let unlockedAny = false;
     for (const b of this.blocks) {
       if (b.removed) continue;
-      if (b.type !== 'dependent') continue;
-      b.refreshDependency(this.blocks);
+      if (b.type === "dependent") {
+        b.refreshDependency(this.blocks);
+      } else if (b.type === "lock") {
+        b.refreshLock(this.grid);
+      } else {
+        continue;
+      }
       const wasLocked = this.prevLocked.get(b.blockId) ?? true;
       const nowLocked = b.isLocked();
       if (wasLocked && !nowLocked) unlockedAny = true;
@@ -606,9 +745,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private afterRemove(): void {
-    const remaining = this.blocks.filter((b) => !b.removed && b.type !== 'obstacle');
+    const remaining = this.blocks.filter(
+      (b) => !b.removed && b.type !== "obstacle",
+    );
     if (remaining.length === 0) {
-      this.endLevel('WIN');
+      this.endLevel("WIN");
       return;
     }
     this.checkDeadEnd();
@@ -616,28 +757,30 @@ export class GameScene extends Phaser.Scene {
 
   private checkDeadEnd(): void {
     if (this.deadEndShown) return;
-    const remaining = this.blocks.filter((b) => !b.removed && b.type !== 'obstacle');
+    const remaining = this.blocks.filter(
+      (b) => !b.removed && b.type !== "obstacle",
+    );
     if (remaining.length === 0) return;
     if (!this.movement.anyValidMove(this.blocks, this.grid)) {
       this.deadEndShown = true;
-      Analytics.log('level_failed', {
-        reason: 'dead_end',
+      Analytics.log("level_failed", {
+        reason: "dead_end",
         moves: useGameStore.getState().movesThisLevel,
       });
       AudioManager.deadEnd();
       deadEndPulse(this);
       remaining.forEach((b) => b.pulseRed());
-      this.time.delayedCall(900, () => this.endLevel('STUCK'));
+      this.time.delayedCall(900, () => this.endLevel("STUCK"));
     }
   }
 
-  private endLevel(result: 'WIN' | 'STUCK'): void {
+  private endLevel(result: "WIN" | "STUCK"): void {
     const store = useGameStore.getState();
-    if (result === 'WIN') {
+    if (result === "WIN") {
       AudioManager.win();
       store.unlockNext();
       SDKManager.happytime();
-      Analytics.log('level_completed', {
+      Analytics.log("level_completed", {
         level: store.currentLevel,
         moves: store.movesThisLevel,
       });

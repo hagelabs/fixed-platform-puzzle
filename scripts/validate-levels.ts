@@ -1,4 +1,4 @@
-import { LEVELS } from '../src/config/Levels.ts';
+import { LEVELS, PACKS } from '../src/config/Levels.ts';
 import { BlockData } from '../src/types/Game.ts';
 
 let errors = 0;
@@ -8,9 +8,15 @@ function err(levelId: number, msg: string): void {
   errors++;
 }
 
-const VALID_TYPES = new Set(['simple', 'constrained', 'dependent', 'obstacle']);
+function packErr(packId: string, msg: string): void {
+  console.error(`PACK[${packId}]: ${msg}`);
+  errors++;
+}
+
+const VALID_TYPES = new Set(['simple', 'constrained', 'dependent', 'obstacle', 'lock']);
 const VALID_DIRS = new Set(['UP', 'DOWN', 'LEFT', 'RIGHT']);
 const VALID_SIDES = new Set(['TOP', 'BOTTOM', 'LEFT', 'RIGHT']);
+const VALID_PACK_IDS = new Set(PACKS.map((p) => p.id));
 
 console.log('id  size   blocks (s/c/d/o)  exits');
 console.log('--- -----  ----------------  -----');
@@ -62,6 +68,13 @@ for (const level of LEVELS) {
 
   if (level.exits.length === 0) err(level.id, 'no exits defined');
 
+  if (typeof level.parMoves !== 'number' || !Number.isFinite(level.parMoves) || level.parMoves < 1) {
+    err(level.id, `invalid parMoves=${level.parMoves}`);
+  }
+  if (level.pack !== undefined && !VALID_PACK_IDS.has(level.pack)) {
+    err(level.id, `unknown pack '${level.pack}'`);
+  }
+
   const simple = counts.simple;
   const con = counts.constrained;
   const dep = counts.dependent;
@@ -87,6 +100,40 @@ for (const level of LEVELS) {
   }
 }
 
+// Per-pack difficulty drift (warn if intra-pack drop >60% — usually intentional breather, but flag big ones)
+for (const pack of PACKS) {
+  const levels = LEVELS.filter((l) => l.pack === pack.id).sort((a, b) => a.id - b.id);
+  if (levels.length === 0) {
+    packErr(pack.id, 'no levels assigned');
+    continue;
+  }
+  for (let i = 1; i < levels.length; i++) {
+    const prev = levels[i - 1].parMoves;
+    const cur = levels[i].parMoves;
+    if (prev > 0 && cur < prev * 0.4) {
+      console.warn(
+        `PACK[${pack.id}] WARN: big difficulty drop L${levels[i - 1].id} par=${prev} → L${levels[i].id} par=${cur} (breather?)`,
+      );
+    }
+  }
+}
+
+// Unique level IDs
+const seenIds = new Set<number>();
+for (const lvl of LEVELS) {
+  if (seenIds.has(lvl.id)) err(lvl.id, 'duplicate level id');
+  seenIds.add(lvl.id);
+}
+
+console.log('---');
+console.log('packs:');
+for (const p of PACKS) {
+  const lvls = LEVELS.filter((l) => l.pack === p.id);
+  const pars = lvls.map((l) => l.parMoves);
+  const minP = pars.length ? Math.min(...pars) : 0;
+  const maxP = pars.length ? Math.max(...pars) : 0;
+  console.log(`  ${p.id}: ${lvls.length} levels, par range [${minP}..${maxP}]`);
+}
 console.log('---');
 console.log(`total levels: ${LEVELS.length}`);
 console.log(`errors: ${errors}`);

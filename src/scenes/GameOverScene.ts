@@ -5,6 +5,9 @@ import { AdManager } from '../managers/AdManager';
 import { confetti, fadeIn, fadeOutAndStart } from '../utils/Effects';
 import { TOKENS, FONT_NEO, neoButton, dottedBackground, popIn, slideUpIn } from '../ui/Theme';
 import { getRandomQuote } from '../config/Quotes';
+import { getLevel, starsFor } from '../config/Levels';
+import { Analytics } from '../managers/AnalyticsManager';
+import { todayISO } from '../managers/GameStateManager';
 
 interface GameOverData {
   result: 'WIN' | 'STUCK';
@@ -34,10 +37,31 @@ export class GameOverScene extends Phaser.Scene {
     const { width } = this.scale;
     const cx = width / 2;
     const store = useGameStore.getState();
-    const isLast = store.currentLevel >= TOTAL_LEVELS;
+    const isDaily = store.dailyMode;
+    const isLast = !isDaily && store.currentLevel >= TOTAL_LEVELS;
 
+    const level = getLevel(store.currentLevel);
+    const par = level.parMoves;
+    const stars = starsFor(par, store.movesThisLevel);
+    const prevBest = store.starsFor(store.currentLevel);
+    store.recordStars(store.currentLevel, stars);
+    Analytics.track('star_earned', { levelId: store.currentLevel, stars, par, moves: store.movesThisLevel });
+
+    const streakResult = store.tickStreakOnWin();
+    if (streakResult.milestone) {
+      Analytics.track('streak_milestone', { streak: streakResult.streak });
+    }
+
+    if (isDaily) {
+      const date = todayISO();
+      store.recordDailyResult(date, true, stars);
+      Analytics.track('daily_completed', { date, levelId: store.currentLevel, stars });
+      store.endDaily();
+    }
+
+    const headLabel = isDaily ? 'DAILY DONE!' : 'CLEARED!';
     const headTxt = this.add
-      .text(cx, 180, 'CLEARED!', {
+      .text(cx, 180, headLabel, {
         fontFamily: FONT_NEO,
         fontSize: '94px',
         color: TOKENS.inkHex,
@@ -45,8 +69,9 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
     popIn(this, headTxt, 0);
 
+    const lvlLabel = isDaily ? `DAILY · ${store.movesThisLevel} MOVES · PAR ${par}` : `LEVEL ${store.currentLevel} · ${store.movesThisLevel} MOVES · PAR ${par}`;
     const subTxt = this.add
-      .text(cx, 282, `LEVEL ${store.currentLevel} · ${store.movesThisLevel} MOVES`, {
+      .text(cx, 282, lvlLabel, {
         fontFamily: FONT_NEO,
         fontSize: '32px',
         color: TOKENS.inkHex,
@@ -54,13 +79,39 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
     this.fadeTextIn(subTxt, 140, 0.7);
 
+    this.drawStarRow(cx, 380, stars, prevBest);
+
+    if (streakResult.streak >= 2) {
+      const streakTxt = this.add
+        .text(cx, 470, `🔥 STREAK ${streakResult.streak}${streakResult.milestone ? ' · MILESTONE!' : ''}`, {
+          fontFamily: FONT_NEO,
+          fontSize: '34px',
+          color: TOKENS.inkHex,
+        })
+        .setOrigin(0.5);
+      this.fadeTextIn(streakTxt, 700, streakResult.milestone ? 1 : 0.85);
+    }
+
     this.drawQuotePanel(560, 680, 820, 460);
 
     const btnX = 1340;
     const btnW = 460;
     const btnH = 120;
 
-    if (isLast) {
+    if (isDaily) {
+      const menuBtn = neoButton(this, btnX, 620, btnW, btnH, 'MAIN MENU', TOKENS.sky, () => {
+        fadeOutAndStart(this, SCENE_KEYS.Menu);
+      });
+      slideUpIn(this, menuBtn.container, 380);
+      const doneTxt = this.add
+        .text(btnX, 790, 'COME BACK TOMORROW', {
+          fontFamily: FONT_NEO,
+          fontSize: '28px',
+          color: TOKENS.inkHex,
+        })
+        .setOrigin(0.5);
+      this.fadeTextIn(doneTxt, 520, 0.65);
+    } else if (isLast) {
       const doneTxt = this.add
         .text(btnX, 540, 'ALL LEVELS DONE', {
           fontFamily: FONT_NEO,
@@ -69,23 +120,77 @@ export class GameOverScene extends Phaser.Scene {
         })
         .setOrigin(0.5);
       this.fadeTextIn(doneTxt, 380);
+      const menuBtn = neoButton(this, btnX, 710, btnW, btnH, 'MAIN MENU', TOKENS.danger, () => {
+        fadeOutAndStart(this, SCENE_KEYS.Menu);
+      });
+      slideUpIn(this, menuBtn.container, 480);
     } else {
       const resumeBtn = neoButton(this, btnX, 560, btnW, btnH, 'RESUME', TOKENS.mint, () => {
         useGameStore.getState().setCurrentLevel(useGameStore.getState().currentLevel + 1);
         fadeOutAndStart(this, SCENE_KEYS.Game);
       });
       slideUpIn(this, resumeBtn.container, 380);
+
+      const restartBtn = neoButton(this, btnX, 710, btnW, btnH, 'RESTART', TOKENS.yellow, () => {
+        fadeOutAndStart(this, SCENE_KEYS.Game);
+      });
+      slideUpIn(this, restartBtn.container, 480);
+
+      const menuBtn = neoButton(this, btnX, 860, btnW, btnH, 'MAIN MENU', TOKENS.danger, () => {
+        fadeOutAndStart(this, SCENE_KEYS.Menu);
+      });
+      slideUpIn(this, menuBtn.container, 580);
     }
+  }
 
-    const restartBtn = neoButton(this, btnX, 710, btnW, btnH, 'RESTART', TOKENS.yellow, () => {
-      fadeOutAndStart(this, SCENE_KEYS.Game);
-    });
-    slideUpIn(this, restartBtn.container, 480);
+  private drawStarRow(cx: number, cy: number, earned: 1 | 2 | 3, prevBest: number): void {
+    const size = 70;
+    const gap = 32;
+    const total = 3;
+    const startX = cx - ((size + gap) * (total - 1)) / 2;
+    for (let i = 0; i < total; i++) {
+      const x = startX + i * (size + gap);
+      const filled = i < earned;
+      const isNew = filled && i >= prevBest;
+      const star = this.drawStar(x, cy, size, filled ? 0xFFD23F : 0xD9D9D9);
+      star.setAlpha(0);
+      star.setScale(0);
+      this.tweens.add({
+        targets: star,
+        alpha: 1,
+        scale: 1,
+        duration: 320,
+        delay: 220 + i * 140,
+        ease: 'Back.easeOut',
+      });
+      if (isNew) {
+        this.tweens.add({
+          targets: star,
+          scale: { from: 1.3, to: 1 },
+          duration: 480,
+          delay: 220 + i * 140 + 320,
+          ease: 'Sine.easeOut',
+        });
+      }
+    }
+  }
 
-    const menuBtn = neoButton(this, btnX, 860, btnW, btnH, 'MAIN MENU', TOKENS.danger, () => {
-      fadeOutAndStart(this, SCENE_KEYS.Menu);
-    });
-    slideUpIn(this, menuBtn.container, 580);
+  private drawStar(x: number, y: number, size: number, color: number): Phaser.GameObjects.Graphics {
+    const g = this.add.graphics();
+    g.fillStyle(color, 1);
+    g.lineStyle(4, 0x222222, 1);
+    const outer = size / 2;
+    const inner = outer * 0.45;
+    const pts: Phaser.Math.Vector2[] = [];
+    for (let i = 0; i < 10; i++) {
+      const a = (Math.PI / 5) * i - Math.PI / 2;
+      const r = i % 2 === 0 ? outer : inner;
+      pts.push(new Phaser.Math.Vector2(Math.cos(a) * r, Math.sin(a) * r));
+    }
+    g.fillPoints(pts, true);
+    g.strokePoints(pts, true);
+    g.setPosition(x, y);
+    return g;
   }
 
   private fadeTextIn(t: Phaser.GameObjects.Text, delay: number, finalAlpha = 1, slide = 32): void {
@@ -190,6 +295,7 @@ export class GameOverScene extends Phaser.Scene {
     });
 
     neoButton(this, cx, cy + 290, 504, 108, 'MAIN MENU', TOKENS.danger, () => {
+      if (useGameStore.getState().dailyMode) useGameStore.getState().endDaily();
       fadeOutAndStart(this, SCENE_KEYS.Menu);
     });
   }

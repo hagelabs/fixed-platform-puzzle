@@ -1,4 +1,6 @@
-type EventName =
+declare const __BUILD_TARGET__: string | undefined;
+
+export type EventName =
   | 'session_start'
   | 'level_started'
   | 'level_completed'
@@ -7,7 +9,14 @@ type EventName =
   | 'hint_used'
   | 'ad_request'
   | 'ad_complete'
-  | 'ad_error';
+  | 'ad_error'
+  | 'daily_started'
+  | 'daily_completed'
+  | 'streak_milestone'
+  | 'star_earned'
+  | 'pack_cleared'
+  | 'skin_unlocked'
+  | 'skin_equipped';
 
 interface AnalyticsEvent {
   name: EventName;
@@ -15,28 +24,61 @@ interface AnalyticsEvent {
   meta?: Record<string, unknown>;
 }
 
+interface PokiSDKShape {
+  customEvent?: (noun: string, verb: string, value?: string, payload?: object) => void;
+}
+interface CGAnalyticsShape {
+  trackEvent?: (event: string, props?: object) => void;
+}
+interface GDSDKShape {
+  preloadAd?: (...args: unknown[]) => void;
+  showAd?: (...args: unknown[]) => void;
+}
+
 class AnalyticsManagerImpl {
   private buffer: AnalyticsEvent[] = [];
+  private target: string;
+
+  constructor() {
+    this.target = typeof __BUILD_TARGET__ !== 'undefined' ? __BUILD_TARGET__ : 'unknown';
+  }
+
+  track(name: EventName, meta?: Record<string, unknown>): void {
+    this.log(name, meta);
+  }
 
   log(name: EventName, meta?: Record<string, unknown>): void {
     const e: AnalyticsEvent = { name, ts: Date.now(), meta };
     this.buffer.push(e);
     if (this.buffer.length > 200) this.buffer.shift();
 
-    const w = window as unknown as {
-      PokiSDK?: {
-        customEvent?: (noun: string, verb: string, value?: string, payload?: object) => void;
-      };
-    };
     try {
-      const sep = name.indexOf('_');
-      const noun = sep >= 0 ? name.slice(0, sep) : name;
-      const verb = sep >= 0 ? name.slice(sep + 1) : 'event';
-      w.PokiSDK?.customEvent?.(noun, verb, '', meta || {});
+      this.routeToPlatform(name, meta);
     } catch {
       /* noop */
     }
     console.debug('[analytics]', name, meta || '');
+  }
+
+  private routeToPlatform(name: EventName, meta?: Record<string, unknown>): void {
+    const w = window as unknown as {
+      PokiSDK?: PokiSDKShape;
+      CrazyGames?: { SDK?: { analytics?: CGAnalyticsShape } };
+      gdsdk?: GDSDKShape;
+    };
+
+    if (this.target === 'poki' && w.PokiSDK?.customEvent) {
+      const sep = name.indexOf('_');
+      const noun = sep >= 0 ? name.slice(0, sep) : name;
+      const verb = sep >= 0 ? name.slice(sep + 1) : 'event';
+      w.PokiSDK.customEvent(noun, verb, '', meta || {});
+      return;
+    }
+    if (this.target === 'crazygames' && w.CrazyGames?.SDK?.analytics?.trackEvent) {
+      w.CrazyGames.SDK.analytics.trackEvent(name, meta || {});
+      return;
+    }
+    // itch / gamedistribution / dev: console-only
   }
 
   recent(): AnalyticsEvent[] {

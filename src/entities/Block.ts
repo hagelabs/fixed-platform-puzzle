@@ -4,6 +4,8 @@ import { COLORS } from '../config/Constants';
 import { TOKENS } from '../ui/Theme';
 import { Grid } from './Grid';
 import { AudioManager } from '../managers/AudioManager';
+import { useGameStore } from '../managers/GameStateManager';
+import { drawSkinOverlay, SkinId } from '../config/Skins';
 
 export class Block extends Phaser.GameObjects.Container {
   public readonly blockId: string;
@@ -78,6 +80,11 @@ export class Block extends Phaser.GameObjects.Container {
     return COLORS[this.color];
   }
 
+  public refreshLock(grid: Grid): void {
+    if (this.type !== 'lock' || !this.locked) return;
+    if (grid.isColorUnlocked(this.color)) this.unlock();
+  }
+
   private drawBody(fill: number): void {
     const g = this.bodyG;
     const w = this.bodyW;
@@ -124,6 +131,14 @@ export class Block extends Phaser.GameObjects.Container {
         g.strokePath();
       }
     }
+
+    // Apply equipped skin overlay to simple movable blocks only
+    if (this.type === 'simple') {
+      const skinId = (useGameStore.getState().equippedSkin as SkinId) ?? 'default';
+      const inner = w - borderPx * 2;
+      const innerH = h - borderPx * 2;
+      drawSkinOverlay(g, skinId, inner, innerH, Math.max(0, cornerR - borderPx / 2), fill);
+    }
   }
 
   private drawIcon(): void {
@@ -148,11 +163,25 @@ export class Block extends Phaser.GameObjects.Container {
       g.strokeCircle(sep, 0, r);
       g.fillStyle(TOKENS.ink, 1);
       g.fillRect(-sep + r * 0.6, -r * 0.32, sep * 2 - r * 1.2, r * 0.6);
+    } else if (this.type === 'lock') {
+      // padlock: shackle (open arc) + body
+      const size = Math.min(this.bodyW, this.bodyH);
+      const bw = size * 0.42;
+      const bh = size * 0.32;
+      const sr = size * 0.18;
+      g.lineStyle(Math.max(4, size * 0.05), TOKENS.ink, 1);
+      g.beginPath();
+      g.arc(0, -bh * 0.3, sr, Math.PI, 0, false);
+      g.strokePath();
+      g.fillStyle(TOKENS.ink, 1);
+      g.fillRoundedRect(-bw / 2, -bh / 2 + sr * 0.4, bw, bh, 6);
+      g.fillStyle(0xFFFFFF, 0.9);
+      g.fillCircle(0, sr * 0.7, size * 0.05);
     }
 
     this.add(g);
     this.iconG = g;
-    if (this.type === 'dependent') {
+    if (this.type === 'dependent' || this.type === 'lock') {
       this.locked = true;
       this.setAlpha(0.62);
     }
@@ -217,7 +246,7 @@ export class Block extends Phaser.GameObjects.Container {
 
   public setHover(state: boolean): void {
     if (this.removed || this.type === 'obstacle') return;
-    if (this.type === 'dependent' && this.locked) return;
+    if ((this.type === 'dependent' || this.type === 'lock') && this.locked) return;
     if (this.hovered === state) return;
     this.hovered = state;
     if (state) AudioManager.hover();
@@ -252,7 +281,7 @@ export class Block extends Phaser.GameObjects.Container {
 
   public containsPointer(worldX: number, worldY: number): boolean {
     if (this.removed || this.type === 'obstacle') return false;
-    if (this.type === 'dependent' && this.locked) return false;
+    if ((this.type === 'dependent' || this.type === 'lock') && this.locked) return false;
     const localX = worldX - this.x;
     const localY = worldY - this.y;
 
@@ -265,7 +294,8 @@ export class Block extends Phaser.GameObjects.Container {
 
   public containsPointerForHint(worldX: number, worldY: number): boolean {
     if (this.removed) return false;
-    if (this.type !== 'dependent' || !this.locked) return false;
+    if (!this.locked) return false;
+    if (this.type !== 'dependent' && this.type !== 'lock') return false;
     const localX = worldX - this.x;
     const localY = worldY - this.y;
     const shadow = TOKENS.shadowOffset;

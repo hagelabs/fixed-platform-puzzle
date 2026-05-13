@@ -4,6 +4,8 @@ import { SDKManager } from './managers/SDKManager';
 import { Analytics } from './managers/AnalyticsManager';
 import { AudioManager } from './managers/AudioManager';
 
+declare const __BUILD_TARGET__: string;
+
 async function waitForFonts(): Promise<void> {
   if (!('fonts' in document)) return;
   try {
@@ -54,6 +56,26 @@ function emitReady(): void {
   window.dispatchEvent(new Event('fpp:ready'));
 }
 
+function installFullscreenAutoTrigger(game: Phaser.Game): void {
+  if (typeof __BUILD_TARGET__ === 'undefined' || __BUILD_TARGET__ !== 'itch') return;
+  if (!game.device.fullscreen.available) return;
+
+  let triggered = false;
+  const trigger = (): void => {
+    if (triggered) return;
+    triggered = true;
+    try {
+      game.scale.startFullscreen();
+    } catch (e) {
+      console.warn('[fullscreen] request failed', e);
+    }
+  };
+
+  ['pointerdown', 'touchstart', 'keydown'].forEach((ev) => {
+    document.addEventListener(ev, trigger, { capture: true, passive: true, once: true });
+  });
+}
+
 function installAudioUnlock(): void {
   const unlock = (): void => {
     AudioManager.unlock();
@@ -81,6 +103,7 @@ window.addEventListener('load', async () => {
   emitProgress(90, 'Starting game...');
   Analytics.log('session_start', { platform: SDKManager.getPlatform() });
   const game = new Phaser.Game(gameConfig);
+  installFullscreenAutoTrigger(game);
 
   game.events.once('ready', () => emitReady());
   // Fallback: emit ready when first scene becomes active.

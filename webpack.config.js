@@ -10,7 +10,9 @@ const zlib = require('zlib');
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
   const analyze = !!env?.analyze;
-  const buildTarget = env?.target === 'itch' ? 'itch' : 'platform';
+  const VALID_TARGETS = ['itch', 'poki', 'crazygames', 'gamedistribution'];
+  const requested = env?.target;
+  const buildTarget = VALID_TARGETS.includes(requested) ? requested : 'platform';
 
   const plugins = [
     new HtmlWebpackPlugin({

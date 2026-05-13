@@ -6,6 +6,7 @@ import { LevelSelectScene } from "../scenes/LevelSelectScene";
 import { GameScene } from "../scenes/GameScene";
 import { PauseScene } from "../scenes/PauseScene";
 import { GameOverScene } from "../scenes/GameOverScene";
+import { CosmeticsScene } from "../scenes/CosmeticsScene";
 
 const dpr =
   typeof window !== "undefined"
@@ -44,5 +45,6 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     GameScene,
     PauseScene,
     GameOverScene,
+    CosmeticsScene,
   ],
 };

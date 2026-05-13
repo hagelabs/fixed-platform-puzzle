@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CELL_SIZE, HUD_HEIGHT } from '../config/Constants';
 import { Block } from './Block';
-import { ExitZone } from '../types/Game';
+import { ExitZone, Color } from '../types/Game';
 import { TOKENS } from '../ui/Theme';
 
 export class Grid {
@@ -13,6 +13,9 @@ export class Grid {
 
   private occupancy: (Block | null)[][];
   private exits: ExitZone[] = [];
+  private iceCells: Set<number> = new Set();
+  private unlockedColors: Set<Color> = new Set();
+  private iceGraphics?: Phaser.GameObjects.Graphics;
   private createdObjects: Phaser.GameObjects.GameObject[] = [];
   private timers: Phaser.Time.TimerEvent[] = [];
 
@@ -22,6 +25,7 @@ export class Grid {
     rows: number,
     exits: ExitZone[] = [],
     sizingDim?: { cols: number; rows: number },
+    iceCells: [number, number][] = [],
   ) {
     this.cols = cols;
     this.rows = rows;
@@ -45,8 +49,50 @@ export class Grid {
     this.originY = HUD_HEIGHT + 50 + (screenH - HUD_HEIGHT - 50 - 150 - boardH) / 2;
 
     this.occupancy = Array.from({ length: rows }, () => Array(cols).fill(null));
+    for (const [c, r] of iceCells) {
+      this.iceCells.add(r * cols + c);
+    }
     this.drawBoard(scene);
+    this.drawIce(scene);
     this.drawExits(scene);
+  }
+
+  private drawIce(scene: Phaser.Scene): void {
+    if (this.iceCells.size === 0) return;
+    const g = scene.add.graphics();
+    this.createdObjects.push(g);
+    this.iceGraphics = g;
+    for (const key of this.iceCells) {
+      const c = key % this.cols;
+      const r = Math.floor(key / this.cols);
+      const x = this.originX + c * this.cellSize + 4;
+      const y = this.originY + r * this.cellSize + 4;
+      const s = this.cellSize - 8;
+      g.fillStyle(0xBFE4FF, 0.55);
+      g.fillRoundedRect(x, y, s, s, 8);
+      g.lineStyle(2, 0x4A90D9, 0.6);
+      g.strokeRoundedRect(x, y, s, s, 8);
+      // diagonal frost lines
+      g.lineStyle(2, 0x4A90D9, 0.35);
+      g.beginPath();
+      g.moveTo(x + 8, y + s - 8);
+      g.lineTo(x + s - 8, y + 8);
+      g.moveTo(x + s / 2, y + 6);
+      g.lineTo(x + s / 2, y + s - 6);
+      g.strokePath();
+    }
+  }
+
+  public hasIce(col: number, row: number): boolean {
+    return this.iceCells.has(row * this.cols + col);
+  }
+
+  public unlockColor(color: Color): void {
+    this.unlockedColors.add(color);
+  }
+
+  public isColorUnlocked(color: Color): boolean {
+    return this.unlockedColors.has(color);
   }
 
   private drawBoard(scene: Phaser.Scene): void {

@@ -274,76 +274,121 @@ interface Phase {
   primarySide: ExitSide;
 }
 
-// Hand-tuned per level for variety. movables = simples + yellows + deps. ≤5 cap for solver.
-const PHASES: Phase[] = [
-  // L1-5: tutorial — 1 block, learn each mechanic
-  { cols: 6, rows: 6, movables: 1, yellows: 0, deps: 0, obstacles: 0, exits: 1, optMin: 2, optMax: 2, depthMode: 'none', primarySide: 'RIGHT' },
-  { cols: 6, rows: 6, movables: 1, yellows: 0, deps: 0, obstacles: 0, exits: 1, optMin: 2, optMax: 2, depthMode: 'none', primarySide: 'BOTTOM' },
-  { cols: 6, rows: 6, movables: 1, yellows: 1, deps: 0, obstacles: 0, exits: 1, optMin: 2, optMax: 2, depthMode: 'none', primarySide: 'LEFT' },
-  { cols: 6, rows: 6, movables: 1, yellows: 1, deps: 0, obstacles: 1, exits: 1, optMin: 2, optMax: 4, depthMode: 'none', primarySide: 'TOP' },
-  { cols: 7, rows: 7, movables: 2, yellows: 0, deps: 1, obstacles: 0, exits: 1, optMin: 4, optMax: 6, depthMode: 'linear', primarySide: 'RIGHT' },
+// PHASES generated programmatically — 4 packs × 30 levels = 120.
+// Tutorial (1-30): simple + constrained dominant, small grids
+// Gears (31-60): dependent intro + depth
+// Stones (61-90): obstacle-heavy
+// Master (91-120): mixed mastery
+const SIDES_CYCLE: ExitSide[] = ['RIGHT', 'BOTTOM', 'LEFT', 'TOP'];
 
-  // L6-10: foundation — 2-3 blocks
-  { cols: 7, rows: 7, movables: 2, yellows: 1, deps: 0, obstacles: 1, exits: 1, optMin: 3, optMax: 6, depthMode: 'none', primarySide: 'BOTTOM' },
-  { cols: 7, rows: 7, movables: 3, yellows: 0, deps: 0, obstacles: 1, exits: 1, optMin: 4, optMax: 7, depthMode: 'none', primarySide: 'LEFT' },
-  { cols: 7, rows: 7, movables: 2, yellows: 1, deps: 1, obstacles: 1, exits: 1, optMin: 5, optMax: 8, depthMode: 'linear', primarySide: 'TOP' },
-  { cols: 8, rows: 8, movables: 3, yellows: 1, deps: 0, obstacles: 2, exits: 1, optMin: 5, optMax: 9, depthMode: 'none', primarySide: 'RIGHT' },
-  { cols: 8, rows: 8, movables: 3, yellows: 0, deps: 1, obstacles: 2, exits: 1, optMin: 6, optMax: 10, depthMode: 'linear', primarySide: 'BOTTOM' },
+function buildPhases(): Phase[] {
+  const out: Phase[] = [];
 
-  // L11-15: depth 1-2
-  { cols: 8, rows: 8, movables: 3, yellows: 1, deps: 1, obstacles: 2, exits: 1, optMin: 6, optMax: 11, depthMode: 'linear', primarySide: 'LEFT' },
-  { cols: 8, rows: 8, movables: 4, yellows: 1, deps: 0, obstacles: 2, exits: 1, optMin: 6, optMax: 11, depthMode: 'none', primarySide: 'TOP' },
-  { cols: 8, rows: 8, movables: 4, yellows: 0, deps: 1, obstacles: 2, exits: 1, optMin: 7, optMax: 12, depthMode: 'linear', primarySide: 'RIGHT' },
-  { cols: 8, rows: 8, movables: 4, yellows: 1, deps: 1, obstacles: 2, exits: 1, optMin: 8, optMax: 13, depthMode: 'linear', primarySide: 'BOTTOM' },
-  { cols: 8, rows: 8, movables: 4, yellows: 0, deps: 2, obstacles: 2, exits: 1, optMin: 9, optMax: 14, depthMode: 'linear', primarySide: 'LEFT' },
+  // === Pack 1: Tutorial (L1-30) ===
+  for (let i = 0; i < 30; i++) {
+    const stage = Math.floor(i / 5); // 0..5
+    const side = SIDES_CYCLE[i % 4];
+    if (stage === 0) {
+      // 1 movable, no obstacles, intro each side
+      out.push({ cols: 6, rows: 6, movables: 1, yellows: i >= 2 ? 1 : 0, deps: 0, obstacles: 0, exits: 1, optMin: 1, optMax: 4, depthMode: 'none', primarySide: side });
+    } else if (stage === 1) {
+      // 1-2 movables, 1 obstacle
+      out.push({ cols: 6, rows: 6, movables: 1 + (i % 2), yellows: 1, deps: 0, obstacles: 1, exits: 1, optMin: 1, optMax: 5, depthMode: 'none', primarySide: side });
+    } else if (stage === 2) {
+      // 2 movables, 1 obstacle
+      out.push({ cols: 7, rows: 7, movables: 2, yellows: i % 2, deps: 0, obstacles: 1, exits: 1, optMin: 2, optMax: 6, depthMode: 'none', primarySide: side });
+    } else if (stage === 3) {
+      // 2-3 movables, 1-2 obstacles
+      out.push({ cols: 7, rows: 7, movables: 2 + (i % 2), yellows: 1, deps: 0, obstacles: 1 + (i % 2), exits: 1, optMin: 3, optMax: 7, depthMode: 'none', primarySide: side });
+    } else if (stage === 4) {
+      // 3 movables, 2 obstacles
+      out.push({ cols: 7, rows: 7, movables: 3, yellows: 1, deps: 0, obstacles: 2, exits: 1, optMin: 4, optMax: 8, depthMode: 'none', primarySide: side });
+    } else {
+      // 3 movables, mixed, intro 8x8
+      out.push({ cols: 8, rows: 8, movables: 3, yellows: i % 2, deps: 0, obstacles: 2, exits: 1, optMin: 4, optMax: 9, depthMode: 'none', primarySide: side });
+    }
+  }
 
-  // L16-20: 9x9
-  { cols: 9, rows: 9, movables: 4, yellows: 1, deps: 1, obstacles: 2, exits: 1, optMin: 8, optMax: 13, depthMode: 'linear', primarySide: 'TOP' },
-  { cols: 9, rows: 9, movables: 4, yellows: 1, deps: 0, obstacles: 3, exits: 1, optMin: 8, optMax: 13, depthMode: 'none', primarySide: 'RIGHT' },
-  { cols: 9, rows: 9, movables: 4, yellows: 0, deps: 2, obstacles: 3, exits: 1, optMin: 10, optMax: 15, depthMode: 'branch', primarySide: 'BOTTOM' },
-  { cols: 9, rows: 9, movables: 4, yellows: 1, deps: 1, obstacles: 3, exits: 1, optMin: 10, optMax: 15, depthMode: 'linear', primarySide: 'LEFT' },
-  { cols: 9, rows: 9, movables: 5, yellows: 1, deps: 0, obstacles: 3, exits: 1, optMin: 10, optMax: 16, depthMode: 'none', primarySide: 'TOP' },
+  // === Pack 2: Gears (L31-60) ===
+  for (let i = 0; i < 30; i++) {
+    const stage = Math.floor(i / 5);
+    const side = SIDES_CYCLE[i % 4];
+    if (stage === 0) {
+      // intro dependent — 2 movables 1 dep
+      out.push({ cols: 7, rows: 7, movables: 2, yellows: 0, deps: 1, obstacles: 1, exits: 1, optMin: 3, optMax: 8, depthMode: 'linear', primarySide: side });
+    } else if (stage === 1) {
+      // 3 movables, 1 dep, 2 obstacles
+      out.push({ cols: 8, rows: 8, movables: 3, yellows: i % 2, deps: 1, obstacles: 2, exits: 1, optMin: 5, optMax: 10, depthMode: 'linear', primarySide: side });
+    } else if (stage === 2) {
+      // 3 movables, 2 dep, depth 2
+      out.push({ cols: 8, rows: 8, movables: 3, yellows: 0, deps: 2, obstacles: 2, exits: 1, optMin: 6, optMax: 12, depthMode: 'linear', primarySide: side });
+    } else if (stage === 3) {
+      // 4 movables, 1-2 dep
+      out.push({ cols: 8, rows: 8, movables: 4, yellows: i % 2, deps: 1 + (i % 2), obstacles: 2, exits: 1, optMin: 7, optMax: 13, depthMode: 'linear', primarySide: side });
+    } else if (stage === 4) {
+      // 4 movables, 2 dep, branch mode
+      out.push({ cols: 9, rows: 9, movables: 4, yellows: 1, deps: 2, obstacles: 3, exits: 1, optMin: 8, optMax: 14, depthMode: i % 2 ? 'branch' : 'linear', primarySide: side });
+    } else {
+      // 4 movables, 2 dep mixed
+      out.push({ cols: 9, rows: 9, movables: 4, yellows: 1, deps: 2, obstacles: 3, exits: 1, optMin: 9, optMax: 15, depthMode: 'mixed', primarySide: side });
+    }
+  }
 
-  // L21-25: depth 2-3
-  { cols: 9, rows: 9, movables: 4, yellows: 0, deps: 2, obstacles: 3, exits: 1, optMin: 10, optMax: 16, depthMode: 'linear', primarySide: 'RIGHT' },
-  { cols: 9, rows: 9, movables: 4, yellows: 1, deps: 2, obstacles: 3, exits: 1, optMin: 11, optMax: 17, depthMode: 'linear', primarySide: 'BOTTOM' },
-  { cols: 10, rows: 10, movables: 4, yellows: 1, deps: 1, obstacles: 3, exits: 1, optMin: 11, optMax: 17, depthMode: 'linear', primarySide: 'LEFT' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 1, obstacles: 3, exits: 1, optMin: 12, optMax: 18, depthMode: 'linear', primarySide: 'TOP' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 3, exits: 1, optMin: 13, optMax: 19, depthMode: 'linear', primarySide: 'RIGHT' },
+  // === Pack 3: Stones (L61-90) — obstacle-heavy ===
+  for (let i = 0; i < 30; i++) {
+    const stage = Math.floor(i / 5);
+    const side = SIDES_CYCLE[i % 4];
+    if (stage === 0) {
+      // 3 movables 3 obstacles
+      out.push({ cols: 9, rows: 9, movables: 3, yellows: 1, deps: 0, obstacles: 3, exits: 1, optMin: 5, optMax: 12, depthMode: 'none', primarySide: side });
+    } else if (stage === 1) {
+      // 4 movables 3-4 obstacles
+      out.push({ cols: 9, rows: 9, movables: 4, yellows: i % 2, deps: 1, obstacles: 3 + (i % 2), exits: 1, optMin: 7, optMax: 13, depthMode: 'linear', primarySide: side });
+    } else if (stage === 2) {
+      // 4 movables 4 obstacles
+      out.push({ cols: 10, rows: 10, movables: 4, yellows: 1, deps: 1, obstacles: 4, exits: 1, optMin: 8, optMax: 14, depthMode: 'linear', primarySide: side });
+    } else if (stage === 3) {
+      // 5 movables 4 obstacles
+      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 4, exits: 1, optMin: 10, optMax: 16, depthMode: 'linear', primarySide: side });
+    } else if (stage === 4) {
+      // 5 movables 5 obstacles, dual exit intro
+      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 5, exits: i % 2 ? 2 : 1, optMin: 10, optMax: 17, depthMode: 'branch', primarySide: side });
+    } else {
+      // 5 movables 5 obstacles
+      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 5, exits: 1, optMin: 12, optMax: 18, depthMode: 'mixed', primarySide: side });
+    }
+  }
 
-  // L26-30: branching + 9x9/10x10
-  { cols: 10, rows: 10, movables: 4, yellows: 0, deps: 2, obstacles: 3, exits: 1, optMin: 12, optMax: 18, depthMode: 'branch', primarySide: 'BOTTOM' },
-  { cols: 10, rows: 10, movables: 5, yellows: 0, deps: 3, obstacles: 3, exits: 1, optMin: 13, optMax: 20, depthMode: 'linear', primarySide: 'LEFT' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 1, obstacles: 4, exits: 1, optMin: 13, optMax: 20, depthMode: 'linear', primarySide: 'TOP' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 4, exits: 1, optMin: 14, optMax: 21, depthMode: 'linear', primarySide: 'RIGHT' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 1, obstacles: 4, exits: 1, optMin: 14, optMax: 21, depthMode: 'mixed', primarySide: 'BOTTOM' },
+  // === Pack 4: Master (L91-120) — mixed mastery ===
+  for (let i = 0; i < 30; i++) {
+    const stage = Math.floor(i / 5);
+    const side = SIDES_CYCLE[i % 4];
+    if (stage === 0) {
+      // 5 movables, 3 deps, branching
+      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 3, exits: 1, optMin: 12, optMax: 19, depthMode: 'branch', primarySide: side });
+    } else if (stage === 1) {
+      // 5 movables, 3 deps, mixed
+      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 4, exits: 1, optMin: 14, optMax: 21, depthMode: 'mixed', primarySide: side });
+    } else if (stage === 2) {
+      // 5 movables, dual exit, mixed
+      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 4, exits: 2, optMin: 13, optMax: 21, depthMode: 'mixed', primarySide: side });
+    } else if (stage === 3) {
+      // 5 movables, 4 deps
+      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 4, exits: 1, optMin: 15, optMax: 22, depthMode: 'linear', primarySide: side });
+    } else if (stage === 4) {
+      // 5 movables, 4 deps, mixed
+      out.push({ cols: 10, rows: 10, movables: 5, yellows: i % 2 ? 2 : 1, deps: 3, obstacles: 5, exits: i % 2 ? 2 : 1, optMin: 15, optMax: 23, depthMode: 'mixed', primarySide: side });
+    } else {
+      // legendary
+      out.push({ cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 5, exits: 2, optMin: 16, optMax: 24, depthMode: 'mixed', primarySide: side });
+    }
+  }
 
-  // L31-35: dual exits intro
-  { cols: 10, rows: 10, movables: 4, yellows: 0, deps: 0, obstacles: 3, exits: 2, optMin: 8, optMax: 14, depthMode: 'none', primarySide: 'RIGHT' },
-  { cols: 10, rows: 10, movables: 5, yellows: 0, deps: 3, obstacles: 4, exits: 1, optMin: 14, optMax: 22, depthMode: 'linear', primarySide: 'BOTTOM' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 4, exits: 1, optMin: 14, optMax: 21, depthMode: 'branch', primarySide: 'RIGHT' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 4, exits: 1, optMin: 14, optMax: 22, depthMode: 'mixed', primarySide: 'TOP' },
-  { cols: 10, rows: 10, movables: 5, yellows: 2, deps: 0, obstacles: 3, exits: 2, optMin: 10, optMax: 18, depthMode: 'none', primarySide: 'BOTTOM' },
+  return out;
+}
 
-  // L36-40: max depth
-  { cols: 10, rows: 10, movables: 5, yellows: 0, deps: 4, obstacles: 4, exits: 1, optMin: 16, optMax: 24, depthMode: 'linear', primarySide: 'LEFT' },
-  { cols: 10, rows: 10, movables: 1, yellows: 1, deps: 0, obstacles: 3, exits: 1, optMin: 5, optMax: 9, depthMode: 'none', primarySide: 'BOTTOM' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 4, exits: 1, optMin: 16, optMax: 24, depthMode: 'branch', primarySide: 'RIGHT' },
-  { cols: 10, rows: 10, movables: 4, yellows: 1, deps: 1, obstacles: 4, exits: 1, optMin: 10, optMax: 18, depthMode: 'linear', primarySide: 'TOP' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 4, exits: 2, optMin: 14, optMax: 22, depthMode: 'mixed', primarySide: 'RIGHT' },
-
-  // L41-50: legendary
-  { cols: 10, rows: 10, movables: 5, yellows: 0, deps: 4, obstacles: 4, exits: 1, optMin: 17, optMax: 25, depthMode: 'linear', primarySide: 'BOTTOM' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 2, obstacles: 4, exits: 1, optMin: 14, optMax: 22, depthMode: 'mixed', primarySide: 'LEFT' },
-  { cols: 10, rows: 10, movables: 5, yellows: 0, deps: 3, obstacles: 4, exits: 1, optMin: 15, optMax: 22, depthMode: 'branch', primarySide: 'TOP' },
-  { cols: 10, rows: 10, movables: 5, yellows: 2, deps: 1, obstacles: 4, exits: 2, optMin: 12, optMax: 20, depthMode: 'mixed', primarySide: 'RIGHT' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 4, exits: 1, optMin: 17, optMax: 25, depthMode: 'linear', primarySide: 'BOTTOM' },
-  { cols: 10, rows: 10, movables: 4, yellows: 4, deps: 0, obstacles: 4, exits: 4, optMin: 4, optMax: 14, depthMode: 'none', primarySide: 'RIGHT' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 5, exits: 1, optMin: 17, optMax: 25, depthMode: 'mixed', primarySide: 'LEFT' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 4, exits: 2, optMin: 16, optMax: 24, depthMode: 'mixed', primarySide: 'BOTTOM' },
-  { cols: 10, rows: 10, movables: 5, yellows: 2, deps: 2, obstacles: 5, exits: 2, optMin: 14, optMax: 22, depthMode: 'mixed', primarySide: 'TOP' },
-  { cols: 10, rows: 10, movables: 5, yellows: 1, deps: 3, obstacles: 4, exits: 2, optMin: 18, optMax: 26, depthMode: 'mixed', primarySide: 'RIGHT' },
-];
+const PHASES: Phase[] = buildPhases();
+const TOTAL = PHASES.length;
 
 function getPhase(id: number): Phase { return PHASES[id - 1]; }
 
@@ -531,7 +576,7 @@ function bakeAll(): BakedLevel[] {
   const out: BakedLevel[] = [];
   const sigs = new Set<string>();
 
-  for (let id = 1; id <= 50; id++) {
+  for (let id = 1; id <= TOTAL; id++) {
     const phase = getPhase(id);
     let chosen: BakedLevel | null = null;
     const passes: { maxAttempts: number; budget: number; depth: number; strict: boolean }[] = [
@@ -575,7 +620,7 @@ function bakeAll(): BakedLevel[] {
 // ============================================================
 
 function emitLevelsTs(baked: BakedLevel[]): string {
-  const header = `import { LevelData, BlockData, ExitZone, Direction } from '../types/Game';
+  const header = `import { LevelData, BlockData, Color, ExitZone, Direction } from '../types/Game';
 
 const S = (id: string, c: number, r: number): BlockData => ({
   id, color: 'red', position: [c, r], size: [1, 1], type: 'simple',
@@ -589,21 +634,36 @@ const C = (id: string, c: number, r: number, dir: Direction): BlockData => ({
 const D = (id: string, c: number, r: number, dep: string): BlockData => ({
   id, color: 'blue', position: [c, r], size: [1, 1], type: 'dependent', dependsOn: dep,
 });
+const SC = (id: string, c: number, r: number, color: Color): BlockData => ({
+  id, color, position: [c, r], size: [1, 1], type: 'simple',
+});
+const K = (id: string, c: number, r: number, color: Color): BlockData => ({
+  id, color, position: [c, r], size: [1, 1], type: 'lock',
+});
 const E = (
   side: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT',
   index: number,
 ): ExitZone => ({ side, index });
 const L = (
   id: number, cols: number, rows: number, blocks: BlockData[], exits: ExitZone[],
-): LevelData => ({ id, cols, rows, blocks, exits });
+  parMoves: number, pack?: string, iceCells?: [number, number][],
+): LevelData => ({ id, cols, rows, blocks, exits, parMoves, pack, iceCells });
 
 // AUTO-BAKED via scripts/bake-v2.ts. Each level verified solvable by A* solver
 // matching MovementSystem (slide momentum + constrained + dependent).
+// parMoves = optimal solver solution length (used for 3-star thresholds).
 
 export const LEVELS: LevelData[] = [
 `;
 
-  const body = baked.map(({ lvl }) => {
+  const packOf = (id: number): string => {
+    if (id <= 30) return 'tutorial';
+    if (id <= 60) return 'gears';
+    if (id <= 90) return 'stones';
+    return 'master';
+  };
+
+  const body = baked.map(({ lvl, opt }) => {
     const blocksStr = lvl.blocks.map((b) => {
       if (b.type === 'simple') return `S('${b.id}',${b.pos[0]},${b.pos[1]})`;
       if (b.type === 'obstacle') return `O('${b.id}',${b.pos[0]},${b.pos[1]})`;
@@ -611,13 +671,32 @@ export const LEVELS: LevelData[] = [
       return `D('${b.id}',${b.pos[0]},${b.pos[1]},'${b.dependsOn}')`;
     }).join(', ');
     const exitsStr = lvl.exits.map((e) => `E('${e.side}',${e.index})`).join(', ');
-    return `  L(${lvl.id}, ${lvl.cols}, ${lvl.rows}, [${blocksStr}], [${exitsStr}]),`;
+    return `  L(${lvl.id}, ${lvl.cols}, ${lvl.rows}, [${blocksStr}], [${exitsStr}], ${opt}, '${packOf(lvl.id)}'),`;
   }).join('\n');
 
-  const solutionsBody = baked.map(({ lvl, path }) => {
+  // Fixture levels — hand-authored to showcase ice + lock mechanics. Appended to master pack.
+  const fixtures = `
+  // === FIXTURE LEVELS (hand-authored: ice + lock mechanics) ===
+  L(121, 7, 7, [SC('m1',1,3,'red')], [E('RIGHT',3)], 1, 'master', [[3,3],[4,3]]),
+  L(122, 7, 7, [SC('m1',0,2,'red'), SC('m2',0,4,'blue')], [E('RIGHT',2), E('RIGHT',4)], 2, 'master', [[3,2],[3,4]]),
+  L(123, 8, 8, [SC('m1',1,4,'green'), O('o1',5,2)], [E('RIGHT',4)], 1, 'master', [[3,4],[4,4],[5,4],[6,4]]),
+  L(124, 7, 7, [SC('m1',0,3,'red'), K('k1',5,3,'red')], [E('RIGHT',3)], 2, 'master'),
+  L(125, 8, 8, [SC('m1',0,1,'blue'), K('k1',3,5,'blue'), O('o1',5,5)], [E('RIGHT',1), E('RIGHT',5)], 3, 'master'),
+  L(126, 9, 9, [SC('m1',0,4,'red'), K('k1',4,4,'red'), K('k2',7,4,'red')], [E('RIGHT',4)], 4, 'master'),`;
+
+  const bakedSolutions = baked.map(({ lvl, path }) => {
     const moves = path.map((m) => `{blockId:'${m.blockId}',dir:'${m.dir}'}`).join(', ');
     return `  ${lvl.id}: [${moves}],`;
   }).join('\n');
+
+  const fixtureSolutions = `  121: [{blockId:'m1',dir:'RIGHT'}],
+  122: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'}],
+  123: [{blockId:'m1',dir:'RIGHT'}],
+  124: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
+  125: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k1',dir:'DOWN'}],
+  126: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k2',dir:'RIGHT'}],`;
+
+  const solutionsBody = bakedSolutions + '\n' + fixtureSolutions;
 
   const footer = `
 ];
@@ -638,8 +717,35 @@ export function getLevel(id: number): LevelData {
 
 export const MAX_LEVEL_COLS = LEVELS.reduce((m, l) => Math.max(m, l.cols), 0);
 export const MAX_LEVEL_ROWS = LEVELS.reduce((m, l) => Math.max(m, l.rows), 0);
+
+export interface WorldPack {
+  id: string;
+  name: string;
+  theme: string;
+  levelIds: number[];
+  unlockAfter: number;
+}
+
+export const PACKS: WorldPack[] = [
+  { id: 'tutorial', name: 'Tutorial',  theme: 'intro',     levelIds: LEVELS.filter(l => l.pack === 'tutorial').map(l => l.id), unlockAfter: 0 },
+  { id: 'gears',    name: 'Gears',     theme: 'dependent', levelIds: LEVELS.filter(l => l.pack === 'gears').map(l => l.id),    unlockAfter: 25 },
+  { id: 'stones',   name: 'Stones',    theme: 'obstacle',  levelIds: LEVELS.filter(l => l.pack === 'stones').map(l => l.id),   unlockAfter: 55 },
+  { id: 'master',   name: 'Master',    theme: 'mixed',     levelIds: LEVELS.filter(l => l.pack === 'master').map(l => l.id),   unlockAfter: 85 },
+];
+
+export const FIXTURE_IDS = LEVELS.filter((l) => l.id >= 121).map((l) => l.id);
+
+export function getPackOf(levelId: number): WorldPack | undefined {
+  return PACKS.find((p) => p.levelIds.includes(levelId));
+}
+
+export function starsFor(parMoves: number, moves: number): 1 | 2 | 3 {
+  if (moves <= parMoves) return 3;
+  if (moves <= Math.ceil(parMoves * 1.4)) return 2;
+  return 1;
+}
 `;
-  return header + body + footer;
+  return header + body + '\n' + fixtures + footer;
 }
 
 // ============================================================
@@ -649,7 +755,7 @@ export const MAX_LEVEL_ROWS = LEVELS.reduce((m, l) => Math.max(m, l.rows), 0);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-console.log('Baking 50 levels (v2 solver)...');
+console.log(`Baking ${TOTAL} levels (v2 solver)...`);
 const t0 = Date.now();
 const levels = bakeAll();
 const dt = ((Date.now() - t0) / 1000).toFixed(1);

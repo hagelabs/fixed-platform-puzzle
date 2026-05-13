@@ -18,7 +18,7 @@ export const COLORS: Record<Color, number> = {
 };
 
 export const DRAG_THRESHOLD = 5;
-export const TOTAL_LEVELS = 50;
+export const TOTAL_LEVELS = 126;
 
 export const SCENE_KEYS = {
   Boot: "BootScene",
@@ -27,6 +27,7 @@ export const SCENE_KEYS = {
   Game: "GameScene",
   Pause: "PauseScene",
   GameOver: "GameOverScene",
+  Cosmetics: "CosmeticsScene",
 } as const;
 
 export const FONT_HEADER = '"Bungee", "Arial Black", sans-serif';

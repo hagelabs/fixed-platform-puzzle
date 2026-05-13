@@ -303,7 +303,8 @@ class SDKManagerImpl {
         await this.withTimeout(window.gdsdk.showAd('rewarded'), undefined);
         return true;
       }
-      if (this.platform === 'playgama' && window.bridge?.advertisement?.showRewarded) {
+      if (this.platform === 'playgama') {
+        if (!window.bridge?.advertisement?.showRewarded) return false;
         return await this.withTimeout(this.playgamaRewarded(placement), false);
       }
       return await this.dummyRewarded();
@@ -363,7 +364,6 @@ class SDKManagerImpl {
       return Promise.resolve(false);
     }
     return new Promise<boolean>((resolve) => {
-      let rewarded = false;
       let settled = false;
       const finalize = (result: boolean): void => {
         if (settled) return;
@@ -373,14 +373,15 @@ class SDKManagerImpl {
       };
       const onState = (state: PlaygamaAdState): void => {
         console.info('[playgama] rewarded state:', state);
+        // Playgama spec: grant ONLY in response to the 'rewarded' state.
+        // 'closed' arriving without a prior 'rewarded' means the user
+        // dismissed the ad before completion — no grant.
         if (state === 'rewarded') {
-          // Per Playgama spec: grant only when this state fires before 'closed'.
-          rewarded = true;
+          finalize(true);
           return;
         }
         if (state === 'closed') {
-          // If 'rewarded' did not fire before 'closed', user dismissed early — no grant.
-          finalize(rewarded);
+          finalize(false);
           return;
         }
         if (state === 'failed') finalize(false);

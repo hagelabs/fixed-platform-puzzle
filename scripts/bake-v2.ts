@@ -831,8 +831,17 @@ export const LEVELS: LevelData[] = [
   // L78 — two locks, staggered unlock (1 and 2) — master climax intro
   L(78, 8, 3, [SC('m1',0,0,'red'), K('k1',0,1,1), K('k2',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
   // === FIXTURE PACK (L79-80): legendary finale ===
-  // L79 — penultimate: ice + dependent + obstacles
-  L(79, 8, 5, [SC('m1',0,2,'red'), O('o1',3,2), O('o2',5,1), O('o3',5,3), SC('m2',0,4,'blue'), D('m3',0,0,'m1')], [E('RIGHT',2), E('RIGHT',4), E('TOP',0)], 7, 'fixture', [[2,2],[4,2]]),
+  // L79 — Penultimate showcase. Ice push + lock counter + dep chain depth 4 + all mechanics.
+  // Single exit RIGHT row 5. Lock at (5,5) opens after 3 exits.
+  L(79, 10, 10, [
+    SC('m1',0,5,'red'),
+    D('m2',0,2,'m1'),
+    D('m3',0,8,'m2'),
+    D('m4',9,2,'m3'),
+    SC('m5',3,5,'blue'),
+    K('k1',5,5,3,'purple'),
+    O('o1',9,4), O('o2',7,2), O('o3',2,7), O('o4',4,0), O('o5',6,0), O('o6',1,7), O('o7',8,8), O('o8',2,1), O('o9',7,7), O('o10',3,3), O('o11',1,9), O('o12',4,4), O('o13',4,6), O('o14',6,4), O('o15',6,6), O('o16',1,4), O('o17',1,6),
+  ], [E('RIGHT',5)], 32, 'fixture', [[6,5],[5,3]]),
   // L80 — final boss: ice push + lock counter combined, multi-exit
   L(80, 9, 5, [SC('m1',0,1,'red'), SC('m2',0,3,'blue'), O('o1',3,1), O('o2',3,3), K('k1',0,0,2), K('k2',0,4,2)], [E('RIGHT',1), E('RIGHT',3), E('RIGHT',0), E('RIGHT',4)], 8, 'fixture', [[2,1],[2,3]]),`;
 
@@ -847,7 +856,7 @@ export const LEVELS: LevelData[] = [
   76: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
   77: [{blockId:'m1',dir:'RIGHT'},{blockId:'m2',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'}],
   78: [{blockId:'m1',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'k2',dir:'RIGHT'}],
-  79: [],
+  79: [{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'DOWN'},{blockId:'m1',dir:'RIGHT'},{blockId:'m1',dir:'UP'},{blockId:'m1',dir:'RIGHT'},{blockId:'m5',dir:'UP'},{blockId:'m5',dir:'LEFT'},{blockId:'m5',dir:'UP'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'DOWN'},{blockId:'m5',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'DOWN'},{blockId:'m2',dir:'RIGHT'},{blockId:'m2',dir:'UP'},{blockId:'m2',dir:'RIGHT'},{blockId:'m3',dir:'RIGHT'},{blockId:'m3',dir:'DOWN'},{blockId:'m3',dir:'RIGHT'},{blockId:'m3',dir:'UP'},{blockId:'m3',dir:'RIGHT'},{blockId:'k1',dir:'RIGHT'},{blockId:'m5',dir:'RIGHT'},{blockId:'m4',dir:'LEFT'},{blockId:'m4',dir:'DOWN'},{blockId:'m4',dir:'RIGHT'},{blockId:'m4',dir:'UP'},{blockId:'m4',dir:'RIGHT'}],
   80: [],`;
 
   const solutionsBody = bakedSolutions + '\n' + fixtureSolutions;

@@ -727,7 +727,7 @@ export function bakeOne(spec: PhaseSpec, cfg: BakeOneConfig = {}): BakeOneResult
 }
 
 // Extract solution path with parent tracking (A* variant of forwardSolve).
-function extractSolutionPath(
+export function extractSolutionPath(
   state: ScrambleState, idMap: Map<string, number>, maxStates: number, maxDepth: number,
 ): { blockId: string; dir: Direction }[] {
   const ctx = buildSolverCtx(state, idMap);
@@ -1283,6 +1283,44 @@ if (isMain) {
   } else if (cmd === 'bake') {
     const repoRoot = resolve(dirname(__filename), '..');
     runBake(repoRoot);
+  } else if (cmd === 'solve') {
+    const id = process.argv[3] ? parseInt(process.argv[3], 10) : 0;
+    if (!id) { console.error('Usage: solve <levelId>'); process.exit(1); }
+    const lvl = EXISTING_LEVELS.find((l) => l.id === id);
+    if (!lvl) { console.error(`Level ${id} not found`); process.exit(1); }
+    const blocks: BlockSpec[] = lvl.blocks.map((b) => ({
+      id: b.id,
+      type: (b.type ?? 'simple') as BlockType,
+      pos: b.position as [number, number],
+      direction: b.direction,
+      dependsOn: b.dependsOn,
+      unlockAt: b.unlockAt,
+    }));
+    const spec: PhaseSpec = {
+      id: lvl.id, cols: lvl.cols, rows: lvl.rows,
+      exits: lvl.exits.map((e) => ({ side: e.side as ExitSide, index: e.index })),
+      blocks,
+      obstacles: blocks.filter((b) => b.type === 'obstacle').map((b) => b.pos),
+      iceCells: lvl.iceCells,
+      targetPar: lvl.parMoves,
+      pack: lvl.pack ?? 'fixture',
+    };
+    const { state, idMap } = initialState(spec);
+    // Place movables at their actual positions (override "all exited" init)
+    const movables = blocks.filter((b) => b.type !== 'obstacle');
+    state.positions = movables.map((b) => [b.pos[0], b.pos[1]]);
+    state.exitCount = 0;
+    const t0 = Date.now();
+    const r = forwardSolve(state, idMap, 1_000_000, 200);
+    const dt = ((Date.now() - t0) / 1000).toFixed(2);
+    if (!r.solvable) {
+      console.error(`L${id}: unsolvable (visited ${r.visited} states, ${dt}s)`);
+      process.exit(1);
+    }
+    const path = extractSolutionPath(state, idMap, 1_000_000, 200);
+    console.log(`L${id}: optimal=${r.optimal} visited=${r.visited} (${dt}s)`);
+    const pathStr = path.map((m) => `{blockId:'${m.blockId}',dir:'${m.dir}'}`).join(',');
+    console.log(`  ${id}: [${pathStr}],`);
   } else {
     console.log('Usage:');
     console.log('  npx tsx scripts/bake-constructive.ts test [phaseIdx]               # dryrun samples');
@@ -1290,5 +1328,6 @@ if (isMain) {
     console.log('  npx tsx scripts/bake-constructive.ts bake --pack=stones            # only stones');
     console.log('  npx tsx scripts/bake-constructive.ts bake --ids=44-50              # range');
     console.log('  npx tsx scripts/bake-constructive.ts bake --ids=44,52,58           # specific');
+    console.log('  npx tsx scripts/bake-constructive.ts solve <levelId>               # solve fixture level + print path');
   }
 }

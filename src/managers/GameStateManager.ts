@@ -2,6 +2,9 @@ import { createStore } from 'zustand/vanilla';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { TOTAL_LEVELS } from '../config/Constants';
 
+declare const __DEV__: boolean;
+const DEV = typeof __DEV__ !== 'undefined' && __DEV__;
+
 export const WATCH_COOLDOWN_MS = 3 * 60 * 1000;
 
 export function todayISO(d = new Date()): string {
@@ -148,9 +151,16 @@ const store = createStore<GameState>()(
         }),
       unlockAll: () => set({ unlockedLevel: TOTAL_LEVELS }),
 
-      startWatchCooldown: () => set({ watchCooldownUntil: Date.now() + WATCH_COOLDOWN_MS }),
-      isWatchOnCooldown: () => Date.now() < get().watchCooldownUntil,
+      startWatchCooldown: () => {
+        if (DEV) return; // dev: no cooldown
+        set({ watchCooldownUntil: Date.now() + WATCH_COOLDOWN_MS });
+      },
+      isWatchOnCooldown: () => {
+        if (DEV) return false;
+        return Date.now() < get().watchCooldownUntil;
+      },
       getWatchCooldownSecondsLeft: () => {
+        if (DEV) return 0;
         const remain = get().watchCooldownUntil - Date.now();
         return Math.max(0, Math.ceil(remain / 1000));
       },

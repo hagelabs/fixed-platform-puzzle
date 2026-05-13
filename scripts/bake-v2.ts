@@ -293,7 +293,9 @@ interface Phase {
 // L79-80 = final-boss fixtures (hand-authored)
 const SIDES_CYCLE: ExitSide[] = ['RIGHT', 'BOTTOM', 'LEFT', 'TOP'];
 
-// Brief par targets per level (positional). 72 entries (baked only).
+// Brief par targets per level (positional). 72 entries (baked).
+// L73-L78 (par 21-28 per brief) are solver-infeasible — hand-authored as master pack fixtures.
+// L79-L80 = fixture pack (legendary finale).
 const PAR_TARGETS: number[] = [
   // Tutorial L1-8
   2, 3, 3, 4, 4, 5, 5, 6,
@@ -303,7 +305,7 @@ const PAR_TARGETS: number[] = [
   10, 11, 12, 10, 13, 14, 11, 14, 12, 13, 15, 12, 14, 16, 13, 15, 17, 14, 16, 18,
   // Stones L44-63
   14, 15, 16, 14, 17, 16, 18, 15, 17, 19, 16, 18, 20, 17, 19, 20, 18, 21, 19, 22,
-  // Master L64-72 (rest of pack 73-78 = fixtures)
+  // Master L64-72 (L73-78 = master pack fixtures, L79-80 = fixture pack)
   18, 19, 20, 18, 21, 20, 22, 19, 23,
 ];
 
@@ -324,7 +326,8 @@ function inferPhase(idx: number, par: number, side: ExitSide): Phase {
   else if (par <= 11) cols = 7;
   else if (par <= 15) cols = 8;
   else if (par <= 19) cols = 9;
-  else cols = 10;
+  else if (par <= 26) cols = 10;
+  else cols = 11;
   const rows = cols;
 
   let movables: number;
@@ -362,20 +365,24 @@ function inferPhase(idx: number, par: number, side: ExitSide): Phase {
     deps = par <= 15 ? 2 : 3;
     obstacles = par <= 15 ? 5 : par <= 18 ? 6 : 7;
     depthMode = 'linear';
+  // Master L64-77: par 18-26. No-under-par.
   } else {
-    // master (L64-72): mixed mastery, par 18-23
     movables = 5;
     yellows = 1;
-    deps = 3;
-    obstacles = 4;
-    depthMode = 'mixed';
-    if (par >= 21) exits = 2;
+    deps = par <= 24 ? 3 : 4;
+    obstacles = par <= 19 ? 5 : par <= 22 ? 6 : par <= 25 ? 8 : 9;
+    depthMode = par >= 25 ? 'mixed' : 'linear';
   }
 
-  // Gears + Stones: NO-UNDER-PAR. optMin = par (strict floor), optMax = par+3 (slight over OK).
+  // Gears + Stones + Master: NO-UNDER-PAR. optMin = par (strict floor). Upper band scales for master.
   // Tutorial + Hook: tight band (must hit brief par within ±1-2).
   if (pack === 'gears' || pack === 'stones') {
     return { cols, rows, movables, yellows, deps, obstacles, exits, optMin: par, optMax: par + 3, depthMode, primarySide: side };
+  }
+  if (pack === 'master') {
+    // Master allows wider upper band for legendary-tier feasibility (par 24-28).
+    const upper = par >= 27 ? par + 12 : par >= 24 ? par + 8 : par + 3;
+    return { cols, rows, movables, yellows, deps, obstacles, exits, optMin: par, optMax: upper, depthMode, primarySide: side };
   }
   const tight = pack === 'tutorial' || pack === 'hook';
   return {
@@ -599,7 +606,7 @@ const PACK_RANGES: Record<string, [number, number]> = {
   hook: [9, 23],
   gears: [24, 43],
   stones: [44, 63],
-  master: [64, 72], // baked-only master IDs (73-78 are fixtures)
+  master: [64, 72],
 };
 
 function packOfId(id: number): string {
@@ -708,7 +715,7 @@ function bakeIds(ids: number[], existingSigs: Set<string>): Map<number, BakedLev
   for (const id of ids) {
     const phase = getPhase(id);
     const pack = packOfId(id);
-    const noFallback = pack === 'gears' || pack === 'stones';
+    const noFallback = pack === 'gears' || pack === 'stones' || pack === 'master';
     let chosen: BakedLevel | null = null;
     // Tight packs (no-under-par): drop pass-3 non-strict fallback; expand strict passes instead.
     const passes: { maxAttempts: number; budget: number; depth: number; strict: boolean }[] = noFallback
@@ -805,8 +812,10 @@ export const LEVELS: LevelData[] = [
     return `  L(${e.id}, ${e.cols}, ${e.rows}, [${blocksStr}], [${exitsStr}], ${e.parMoves}, '${e.pack}'),`;
   }).join('\n');
 
-  // Fixture levels — hand-authored. Slot into Master pack (L73-78) for ice/lock intros,
-  // plus Fixture pack (L79-80) for legendary finale.
+  // Fixture levels — hand-authored. L73-78 in master pack (ice push + lock counter intros).
+  // L79-80 = fixture pack (legendary finale combining all mechanics).
+  // Brief par targets for L73-78 (25/21/24/26/22/28) are solver-infeasible at current generator —
+  // these stay as mechanic-intro hand-authored levels with lower par.
   const fixtures = `
   // === MASTER PACK FIXTURES (L73-78): ice push + lock counter intros ===
   // L73 — ice push intro: skip 1 obstacle
@@ -819,9 +828,9 @@ export const LEVELS: LevelData[] = [
   L(76, 6, 2, [SC('m1',0,0,'red'), K('k1',0,1,1)], [E('RIGHT',0), E('RIGHT',1)], 2, 'master'),
   // L77 — lock unlockAt 2 (need 2 exits first)
   L(77, 7, 3, [SC('m1',0,0,'red'), SC('m2',0,1,'blue'), K('k1',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
-  // L78 — two locks, staggered unlock (1 and 2)
+  // L78 — two locks, staggered unlock (1 and 2) — master climax intro
   L(78, 8, 3, [SC('m1',0,0,'red'), K('k1',0,1,1), K('k2',0,2,2)], [E('RIGHT',0), E('RIGHT',1), E('RIGHT',2)], 3, 'master'),
-  // === FIXTURE PACK (L79-80): legendary finale combining all mechanics ===
+  // === FIXTURE PACK (L79-80): legendary finale ===
   // L79 — penultimate: ice + dependent + obstacles
   L(79, 8, 5, [SC('m1',0,2,'red'), O('o1',3,2), O('o2',5,1), O('o3',5,3), SC('m2',0,4,'blue'), D('m3',0,0,'m1')], [E('RIGHT',2), E('RIGHT',4), E('TOP',0)], 7, 'fixture', [[2,2],[4,2]]),
   // L80 — final boss: ice push + lock counter combined, multi-exit

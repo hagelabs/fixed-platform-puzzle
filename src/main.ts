@@ -3,8 +3,10 @@ import { gameConfig } from './config/GameConfig';
 import { SDKManager } from './managers/SDKManager';
 import { Analytics } from './managers/AnalyticsManager';
 import { AudioManager } from './managers/AudioManager';
+import { useGameStore } from './managers/GameStateManager';
 
 declare const __BUILD_TARGET__: string;
+declare const __DEV__: boolean;
 
 async function waitForFonts(): Promise<void> {
   if (!('fonts' in document)) return;
@@ -94,6 +96,12 @@ window.addEventListener('load', async () => {
   emitProgress(20, 'Initializing...');
   patchTextResolution();
   installAudioUnlock();
+
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    // Dev cheats: unlock all levels + zero watch cooldown.
+    useGameStore.getState().unlockAll();
+    console.info('[dev] all levels unlocked + watch cooldown disabled');
+  }
 
   emitProgress(35, 'Connecting SDK...');
   const sdkPromise = SDKManager.init().then(() => emitProgress(60, 'Loading fonts...'));

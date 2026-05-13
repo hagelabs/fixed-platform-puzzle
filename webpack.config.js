@@ -35,6 +35,7 @@ module.exports = (env, argv) => {
     }),
     new webpack.DefinePlugin({
       __BUILD_TARGET__: JSON.stringify(buildTarget),
+      __DEV__: JSON.stringify(!isProduction),
     }),
     new CopyPlugin({
       patterns: [

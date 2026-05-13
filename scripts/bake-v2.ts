@@ -349,12 +349,12 @@ function inferPhase(idx: number, par: number, side: ExitSide): Phase {
     obstacles = par >= 10 ? 3 : par >= 8 ? 2 : 1;
     depthMode = deps >= 2 ? 'linear' : 'linear';
   } else if (pack === 'gears') {
-    // chain depth 2-3, par 10-18
-    movables = par <= 12 ? 4 : 5;
+    // Brief targets: 10-18. Chain depth 2-3. No-under-par enforced via tight band.
+    movables = par <= 11 ? 4 : 5;
     yellows = 1;
-    deps = par <= 12 ? 2 : par <= 15 ? 2 : 3;
-    obstacles = par <= 13 ? 2 : 3;
-    depthMode = par >= 14 ? 'linear' : 'linear';
+    deps = par <= 12 ? 2 : 3;
+    obstacles = par <= 12 ? 3 : par <= 15 ? 4 : 5;
+    depthMode = 'linear';
   } else if (pack === 'stones') {
     // obstacle-heavy, par 14-22
     movables = par <= 17 ? 4 : 5;
@@ -373,7 +373,11 @@ function inferPhase(idx: number, par: number, side: ExitSide): Phase {
     if (par >= 21) exits = 2;
   }
 
-  // Tutorial + Hook: tight band (must hit brief par within ±1-2)
+  // Gears: NO-UNDER-PAR. optMin = par (strict floor), optMax = par+3 (slight over OK).
+  // Tutorial + Hook: tight band (must hit brief par within ±1-2).
+  if (pack === 'gears') {
+    return { cols, rows, movables, yellows, deps, obstacles, exits, optMin: par, optMax: par + 3, depthMode, primarySide: side };
+  }
   const tight = pack === 'tutorial' || pack === 'hook';
   return {
     cols, rows, movables, yellows, deps, obstacles, exits,

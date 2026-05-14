@@ -17,6 +17,7 @@
     "package:playgama": "tsx scripts/package.ts playgama",
     "package:itch": "tsx scripts/package.ts itch",
     "package:discord": "tsx scripts/package.ts discord",
+    "build:discord": "webpack --config webpack.config.js --mode production --env target=discord",
     "release": "tsx scripts/release.ts"
   },
   "keywords": [

@@ -16,6 +16,7 @@
     "package:gamedistribution": "tsx scripts/package.ts gamedistribution",
     "package:playgama": "tsx scripts/package.ts playgama",
     "package:itch": "tsx scripts/package.ts itch",
+    "package:discord": "tsx scripts/package.ts discord",
     "release": "tsx scripts/release.ts"
   },
   "keywords": [
@@ -28,6 +29,7 @@
   "author": "",
   "license": "UNLICENSED",
   "dependencies": {
+    "@discord/embedded-app-sdk": "^2.0.0",
     "phaser": "^4.1.0",
     "zustand": "^5.0.12"
   },

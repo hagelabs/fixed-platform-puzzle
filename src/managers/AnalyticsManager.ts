@@ -96,6 +96,10 @@ class AnalyticsManagerImpl {
       if (msg) w.bridge.platform.sendMessage(msg, meta || {});
       return;
     }
+    if (this.target === 'discord') {
+      // Phase 1: console-only. Phase 2 may forward to Discord activity update API.
+      return;
+    }
     // itch / gamedistribution / dev: console-only
   }
 

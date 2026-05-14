@@ -10,7 +10,7 @@ const zlib = require('zlib');
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
   const analyze = !!env?.analyze;
-  const VALID_TARGETS = ['itch', 'poki', 'crazygames', 'gamedistribution', 'playgama'];
+  const VALID_TARGETS = ['itch', 'poki', 'crazygames', 'gamedistribution', 'playgama', 'discord'];
   const requested = env?.target;
   // Dev mode: default to 'itch' (no SDK script loaded, no Poki/CG init) for clean localhost.
   // Production: default to 'platform' (runtime hostname detection between Poki/CG).
@@ -36,6 +36,9 @@ module.exports = (env, argv) => {
     new webpack.DefinePlugin({
       __BUILD_TARGET__: JSON.stringify(buildTarget),
       __DEV__: JSON.stringify(!isProduction),
+      'process.env.VITE_DISCORD_CLIENT_ID': JSON.stringify(
+        process.env.VITE_DISCORD_CLIENT_ID || ''
+      ),
     }),
     new CopyPlugin({
       patterns: [
@@ -54,6 +57,14 @@ module.exports = (env, argv) => {
       ],
     }),
   ];
+
+  // Non-discord builds: ignore the Discord SDK module so resolution doesn't fail
+  // when the package isn't installed and to keep it out of other bundles.
+  if (buildTarget !== 'discord') {
+    plugins.push(
+      new webpack.IgnorePlugin({ resourceRegExp: /^@discord\/embedded-app-sdk$/ })
+    );
+  }
 
   if (isProduction) {
     plugins.push(

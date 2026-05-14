@@ -211,6 +211,10 @@
       src="https://bridge.playgama.com/v1/stable/playgama-bridge.js"
       onerror="console.info('[SDK] playgama bridge not loaded')"
     ></script>
+    <% } else if (BUILD_TARGET === 'discord') { %>
+    <script>
+      window.__DISCORD_ACTIVITY__ = true;
+    </script>
     <% } else if (BUILD_TARGET === 'platform') { %>
     <script>
       (function loadSDK(src) {

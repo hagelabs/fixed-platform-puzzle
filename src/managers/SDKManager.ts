@@ -1,6 +1,6 @@
 import { AudioManager } from './AudioManager';
 
-type Platform = 'poki' | 'crazygames' | 'gamedistribution' | 'playgama' | 'none';
+type Platform = 'poki' | 'crazygames' | 'gamedistribution' | 'playgama' | 'discord' | 'none';
 type RewardedSize = 'small' | 'medium' | 'large';
 
 type PlaygamaMessage =
@@ -106,12 +106,14 @@ class SDKManagerImpl {
       if (__BUILD_TARGET__ === 'crazygames') return 'crazygames';
       if (__BUILD_TARGET__ === 'gamedistribution') return 'gamedistribution';
       if (__BUILD_TARGET__ === 'playgama') return 'playgama';
+      if (__BUILD_TARGET__ === 'discord') return 'discord';
     }
     const host = window.location.hostname;
     if (host.includes('poki') || window.PokiSDK) return 'poki';
     if (host.includes('crazygames') || window.CrazyGames) return 'crazygames';
     if (host.includes('gamedistribution') || window.gdsdk) return 'gamedistribution';
     if (host.includes('playgama') || window.bridge) return 'playgama';
+    if (host.includes('discordsays.com')) return 'discord';
     return 'none';
   }
 
@@ -201,6 +203,11 @@ class SDKManagerImpl {
           await window.bridge.initialize();
           window.bridge.platform?.sendMessage?.('in_game_loading_started');
         }
+      } else if (this.platform === 'discord') {
+        const { ready } = await import(
+          /* webpackChunkName: "discord-client" */ '../platform/discord/DiscordClient'
+        );
+        await ready();
       }
       this.ready = true;
       console.info('[SDK]', this.platform, 'ready');

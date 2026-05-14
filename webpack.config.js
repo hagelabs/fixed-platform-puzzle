@@ -46,6 +46,10 @@ module.exports = (env, argv) => {
           from: path.resolve(__dirname, 'marketing/TemplateData/logo.png'),
           to: path.resolve(__dirname, 'dist/logo.png'),
         },
+        {
+          from: path.resolve(__dirname, 'src/assets/fonts'),
+          to: path.resolve(__dirname, 'dist/fonts'),
+        },
         ...(buildTarget === 'playgama'
           ? [
               {

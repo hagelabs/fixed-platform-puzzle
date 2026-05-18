@@ -37,6 +37,7 @@ import {
 } from "../ui/Theme";
 import { LevelTutorial, LEVEL_TUTORIALS } from "../ui/LevelTutorial";
 import { paletteUI } from "../config/Palettes";
+import { showConfirm } from "../utils/Confirm";
 
 export class GameScene extends Phaser.Scene {
   private grid!: Grid;
@@ -363,28 +364,55 @@ export class GameScene extends Phaser.Scene {
     AudioManager.uiTap();
 
     if (SDKManager.hasRewardedAds()) {
-      this.watchBtn.setEnabled(false);
-      const ok = await AdManager.showRewarded("hint");
-      if (!ok) {
-        AudioManager.thud();
-        this.refreshWatchLabel();
-        return;
-      }
-    } else {
-      const store = useGameStore.getState();
-      if (store.isWatchOnCooldown()) {
-        AudioManager.thud();
-        this.refreshWatchLabel();
-        return;
-      }
-      store.startWatchCooldown();
+      showConfirm(this, {
+        title: "WATCH AD?",
+        body: "Watch a short ad to see the solution played out for this level.",
+        yesLabel: "WATCH AD",
+        noLabel: "CANCEL",
+        yesColor: TOKENS.mint,
+        onYes: () => {
+          void this.runRewardedFlow();
+        },
+        onNo: () => this.refreshWatchLabel(),
+      });
+      return;
     }
+
+    const store = useGameStore.getState();
+    if (store.isWatchOnCooldown()) {
+      AudioManager.thud();
+      this.refreshWatchLabel();
+      return;
+    }
+    store.startWatchCooldown();
 
     Analytics.log("hint_used", { type: "watch_solution" });
     this.refreshWatchLabel();
 
     this.registry.set("autoplaySolution", true);
     this.scene.restart();
+  }
+
+  private async runRewardedFlow(): Promise<void> {
+    this.watchBtn.setEnabled(false);
+    this.scene.pause();
+    let ok = false;
+    try {
+      ok = await AdManager.showRewarded("hint");
+    } finally {
+      this.scene.resume();
+    }
+    if (!ok) {
+      AudioManager.thud();
+      this.refreshWatchLabel();
+      return;
+    }
+
+    Analytics.log("hint_used", { type: "watch_solution" });
+    this.refreshWatchLabel();
+
+    this.registry.set("autoplaySolution", true);
+    this.time.delayedCall(50, () => this.scene.restart());
   }
 
   private async runAutoplay(): Promise<void> {

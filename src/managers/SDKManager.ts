@@ -294,6 +294,7 @@ class SDKManagerImpl {
     if (this.adInFlight) return false;
     this.adInFlight = true;
     AudioManager.duckForAd(true);
+    this.gameplayStop();
     try {
       if (this.platform === 'poki' && window.PokiSDK?.rewardedBreak) {
         const result = await this.withTimeout(
@@ -321,6 +322,7 @@ class SDKManagerImpl {
     } finally {
       this.adInFlight = false;
       AudioManager.duckForAd(false);
+      this.gameplayStart();
     }
   }
 
